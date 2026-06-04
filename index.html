@@ -9,6 +9,8 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Finanças Beverly">
 <title>Finanças Beverly Araújo</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-180.png">
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Serif+Display:ital@0;1&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
@@ -159,7 +161,7 @@ body.dark .card,.dark .kpi,.dark .fin-stat,.dark .ind,.dark .conta-card,.dark .m
 .fin-sticky-val{font-size:.95rem;font-weight:700;}
 
 /* DASHBOARD */
-.kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:1.25rem;}
+.kpi-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:1rem;margin-bottom:1.25rem;}
 .kpi{background:var(--white);border:1px solid var(--border);border-radius:var(--r);padding:1.125rem 1.25rem;box-shadow:var(--sh);position:relative;overflow:hidden;}
 .kpi::after{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--gold);}
 .kpi-label{font-size:.68rem;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--text-3);margin-bottom:5px;}
@@ -263,6 +265,25 @@ body.dark .card,.dark .kpi,.dark .fin-stat,.dark .ind,.dark .conta-card,.dark .m
 .chart-box{background:var(--white);border:1px solid var(--border);border-radius:var(--r);padding:1.25rem;margin-bottom:1rem;box-shadow:var(--sh);}
 .chart-label{font-size:.8rem;font-weight:700;margin-bottom:.875rem;}
 
+/* INVESTIMENTOS */
+.inv-summary{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;margin-bottom:1.25rem;}
+.inv-card-item{background:var(--white);border:1.5px solid var(--border);border-radius:var(--r);padding:1.25rem;box-shadow:var(--sh);position:relative;}
+.inv-card-item:hover{box-shadow:var(--sh2);}
+.inv-inst{font-size:.72rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-3);margin-bottom:3px;}
+.inv-tipo{font-size:.8rem;font-weight:500;margin-bottom:.5rem;}
+.inv-valor{font-family:'DM Serif Display',serif;font-size:1.35rem;color:var(--gold);line-height:1;margin-bottom:3px;}
+.inv-data{font-size:.68rem;color:var(--text-3);}
+.inv-actions{display:flex;gap:.375rem;margin-top:.875rem;}
+.inv-del{position:absolute;top:.75rem;right:.75rem;width:22px;height:22px;border-radius:50%;border:1px solid #fecaca;background:var(--red-bg);color:var(--red);font-size:.78rem;cursor:pointer;display:flex;align-items:center;justify-content:center;opacity:0;transition:all .15s;}
+.inv-card-item:hover .inv-del{opacity:1;}
+.inv-del:hover{background:var(--red);color:#fff;}
+.inv-hist-item{display:flex;justify-content:space-between;align-items:flex-start;padding:.5rem 0;border-bottom:1px solid var(--border);font-size:.8rem;}
+.inv-hist-item:last-child{border-bottom:none;}
+.inv-hist-tipo{display:inline-flex;align-items:center;padding:1px 7px;border-radius:20px;font-size:.65rem;font-weight:700;}
+.inv-hist-aporte{background:var(--green-bg);color:var(--green);}
+.inv-hist-resgate{background:var(--red-bg);color:var(--red);}
+.inv-hist-criacao{background:var(--gold-pale);color:var(--gold);}
+
 /* RESPONSIVE */
 @media(max-width:768px){
   .sidebar{transform:translateX(-100%);}
@@ -353,6 +374,7 @@ body.dark .card,.dark .kpi,.dark .fin-stat,.dark .ind,.dark .conta-card,.dark .m
       <div class="nav-item" onclick="goPage('contas',this)"><div class="nav-icon">⊙</div>Contas</div>
       <div class="nav-item" onclick="goPage('orcamento',this)"><div class="nav-icon">◫</div>Orçamento</div>
       <div class="nav-item" onclick="goPage('metas',this)"><div class="nav-icon">◈</div>Metas</div>
+      <div class="nav-item" onclick="goPage('investimentos',this)"><div class="nav-icon">◉</div>Investimentos</div>
       <div class="nav-item" onclick="goPage('relatorios',this)"><div class="nav-icon">⊡</div>Relatórios</div>
       <div class="nav-item" onclick="goPage('configuracoes',this)"><div class="nav-icon">⊕</div>Configurações</div>
     </nav>
@@ -399,7 +421,7 @@ body.dark .card,.dark .kpi,.dark .fin-stat,.dark .ind,.dark .conta-card,.dark .m
         <div class="shortcuts">
           <button class="shortcut" onclick="goPage('lancamentos',null);setTimeout(()=>openModal('rec'),80)"><div class="sc-ic">💰</div>Lançar Receita</button>
           <button class="shortcut" onclick="goPage('lancamentos',null);setTimeout(()=>openModal('desp'),80)"><div class="sc-ic">💸</div>Lançar Despesa</button>
-          <button class="shortcut" onclick="goPage('metas',null);setTimeout(()=>openModal('meta'),80)"><div class="sc-ic">🎯</div>Nova Meta</button>
+          <button class="shortcut" onclick="goPage('investimentos',null);setTimeout(()=>openModal('inv'),80)"><div class="sc-ic">📈</div>Novo Investimento</button>
           <button class="shortcut" onclick="goPage('contas',null);setTimeout(()=>openModal('conta'),80)"><div class="sc-ic">🏦</div>Nova Conta</button>
         </div>
         <div class="kpi-grid">
@@ -407,6 +429,7 @@ body.dark .card,.dark .kpi,.dark .fin-stat,.dark .ind,.dark .conta-card,.dark .m
           <div class="kpi"><div class="kpi-label">Despesas do Mês</div><div class="kpi-val" style="color:var(--red)" id="d-desp">—</div><div class="kpi-sub">fixas + variáveis + extras</div></div>
           <div class="kpi"><div class="kpi-label">Saldo do Mês</div><div class="kpi-val" id="d-saldo">—</div><div class="kpi-sub" id="d-saldo-sub">—</div></div>
           <div class="kpi"><div class="kpi-label">A Pagar</div><div class="kpi-val" style="color:var(--yellow)" id="d-pagar">—</div><div class="kpi-sub">pendentes</div></div>
+          <div class="kpi"><div class="kpi-label">Total Investido</div><div class="kpi-val" style="color:var(--blue)" id="d-investido">—</div><div class="kpi-sub" id="d-investido-sub">em carteira</div></div>
         </div>
         <div class="card" style="margin-bottom:1rem">
           <div class="card-title">Saldo por Conta <button class="btn btn-ghost btn-sm" onclick="goPage('contas',null)">Ver todas</button></div>
@@ -574,7 +597,7 @@ body.dark .card,.dark .kpi,.dark .fin-stat,.dark .ind,.dark .conta-card,.dark .m
             <div style="font-size:.82rem;font-weight:700;margin-bottom:1rem;color:var(--gold)">🔍 Filtros</div>
             <div class="form-row">
               <div class="form-group"><label class="form-label">Tipo</label>
-                <select class="form-select" id="fil-tipo"><option value="">Receitas e Despesas</option><option value="receita">Apenas Receitas</option><option value="despesa">Apenas Despesas</option></select>
+                <select class="form-select" id="fil-tipo"><option value="">Receitas e Despesas</option><option value="receita">Apenas Receitas</option><option value="despesa">Apenas Despesas</option><option value="investimento">Apenas Investimentos</option></select>
               </div>
               <div class="form-group"><label class="form-label">Categoria</label>
                 <select class="form-select" id="fil-cat"><option value="">Todas as categorias</option><option>Fixa</option><option>Variável</option><option>Extra</option><option>Fixo</option></select>
@@ -662,6 +685,23 @@ body.dark .card,.dark .kpi,.dark .fin-stat,.dark .ind,.dark .conta-card,.dark .m
             </div>
           </div>
         </div>
+      </div>
+
+      <!-- INVESTIMENTOS -->
+      <div class="page" id="page-investimentos">
+        <div class="sec-header"><span class="sec-title">Investimentos</span><button class="btn btn-gold" onclick="openModal('inv')">+ Novo Investimento</button></div>
+        <!-- Resumo -->
+        <div class="inv-summary">
+          <div class="fin-stat"><div class="fin-stat-label">Total Investido</div><div class="fin-stat-val" style="color:var(--gold)" id="inv-total">—</div></div>
+          <div class="fin-stat"><div class="fin-stat-label">Nº de Investimentos</div><div class="fin-stat-val" id="inv-count">—</div></div>
+          <div class="fin-stat"><div class="fin-stat-label">Instituições</div><div class="fin-stat-val" id="inv-inst-count">—</div></div>
+        </div>
+        <!-- Filtros rápidos -->
+        <div class="qf" style="margin-bottom:1rem">
+          <button class="qf-btn active" onclick="filtrarInv('todos',this)">Todos</button>
+          <button class="qf-btn" id="inv-fil-inst-btn" onclick="filtrarInvInst(this)">Por Instituição</button>
+        </div>
+        <div id="inv-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:1rem"></div>
       </div>
 
     </div><!-- /content -->
@@ -821,6 +861,57 @@ body.dark .card,.dark .kpi,.dark .fin-stat,.dark .ind,.dark .conta-card,.dark .m
   </div>
 </div>
 
+<!-- Modal Novo Investimento -->
+<div class="modal-overlay" id="modal-inv" onclick="closeMBg(event,'inv')">
+  <div class="modal-box modal-sm">
+    <div class="modal-title" id="inv-modal-title">Novo Investimento</div>
+    <input type="hidden" id="inv-edit-id">
+    <div class="form-group"><label class="form-label">Instituição</label><input class="form-input" id="inv-inst" placeholder="Ex: XP, Nubank, Inter..."></div>
+    <div class="form-group"><label class="form-label">Tipo de Investimento</label><input class="form-input" id="inv-tipo" placeholder="Ex: CDB, Tesouro Direto, Ações..."></div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Valor Investido (R$)</label><input class="form-input" id="inv-valor" placeholder="0,00" type="text"></div>
+      <div class="form-group"><label class="form-label">Data</label><input class="form-input" type="date" id="inv-data"></div>
+    </div>
+    <div class="form-group"><label class="form-label">Observações</label><textarea class="form-textarea" id="inv-obs" placeholder="Informações adicionais..." style="min-height:60px"></textarea></div>
+    <div class="modal-footer">
+      <button class="btn btn-danger btn-sm" id="inv-del-btn" style="display:none" onclick="delInv()">Excluir</button>
+      <button class="btn btn-ghost" onclick="closeModal('inv')">Cancelar</button>
+      <button class="btn btn-gold" onclick="saveInv()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Movimentação (aporte/resgate) -->
+<div class="modal-overlay" id="modal-inv-mov" onclick="closeMBg(event,'inv-mov')">
+  <div class="modal-box modal-sm">
+    <div class="modal-title" id="inv-mov-title">Movimentação</div>
+    <input type="hidden" id="inv-mov-id">
+    <div class="form-group"><label class="form-label">Tipo</label>
+      <select class="form-select" id="inv-mov-tipo">
+        <option value="aporte">Aporte (acrescentar)</option>
+        <option value="resgate">Resgate (reduzir)</option>
+      </select>
+    </div>
+    <div class="form-group"><label class="form-label">Valor (R$)</label><input class="form-input" id="inv-mov-valor" placeholder="0,00" type="text"></div>
+    <div class="form-group"><label class="form-label">Observações</label><textarea class="form-textarea" id="inv-mov-obs" placeholder="Descreva a movimentação..." style="min-height:60px"></textarea></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('inv-mov')">Cancelar</button>
+      <button class="btn btn-gold" onclick="confirmarMovInv()">Confirmar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Histórico -->
+<div class="modal-overlay" id="modal-inv-hist" onclick="closeMBg(event,'inv-hist')">
+  <div class="modal-box">
+    <div class="modal-title" id="inv-hist-title">Histórico</div>
+    <div id="inv-hist-lista"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('inv-hist')">Fechar</button>
+    </div>
+  </div>
+</div>
+
 <script>
 // ══════════════════════════════════════════
 // FIREBASE CONFIG
@@ -871,7 +962,7 @@ document.getElementById('l-senha').addEventListener('keydown',e=>{ if(e.key==='E
 document.getElementById('l-email').addEventListener('keydown',e=>{ if(e.key==='Enter') document.getElementById('l-senha').focus(); });
 
 // ══ IN-MEMORY CACHE (evita múltiplas leituras) ══
-let cache = { receitas:[], despesas:[], contas:[], metas:[], orcamentos:[], categorias:[], subcategorias:[] };
+let cache = { receitas:[], despesas:[], contas:[], metas:[], orcamentos:[], categorias:[], subcategorias:[], investimentos:[] };
 
 async function initApp() {
   await Promise.all([
@@ -882,6 +973,7 @@ async function initApp() {
     loadCollection('orcamentos'),
     loadCollection('categorias'),
     loadCollection('subcategorias'),
+    loadCollection('investimentos'),
   ]);
   updateContaSelects();
   updateSubcatSelects();
@@ -964,7 +1056,7 @@ function closeModal(id) { document.getElementById('modal-'+id)?.classList.remove
 function closeMBg(e,id) { if(e.target===e.currentTarget) closeModal(id); }
 
 // ══ NAVIGATION ══
-const pageTitles = {dashboard:'Dashboard',lancamentos:'Lançamentos',contas:'Contas & Carteiras',orcamento:'Orçamento Mensal',metas:'Metas Financeiras',relatorios:'Relatórios',configuracoes:'Configurações'};
+const pageTitles = {dashboard:'Dashboard',lancamentos:'Lançamentos',contas:'Contas & Carteiras',orcamento:'Orçamento Mensal',metas:'Metas Financeiras',investimentos:'Investimentos',relatorios:'Relatórios',configuracoes:'Configurações'};
 function goPage(id, el) {
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
@@ -978,6 +1070,7 @@ function goPage(id, el) {
   if(id==='contas') renderContas();
   if(id==='metas') renderMetas();
   if(id==='orcamento') renderOrcamento();
+  if(id==='investimentos') renderInvestimentos();
   if(id==='relatorios') renderRelatorios();
   if(id==='dashboard') renderDashboard();
   if(id==='configuracoes') renderConfiguracoes();
@@ -1029,7 +1122,11 @@ function renderDashboard() {
   const saldo = totalRec - totalDesp;
   const pendentes = despMes.filter(d=>d.status!=='Pago').length;
 
-  const sid=(id,v)=>{ const el=document.getElementById(id); if(el) el.textContent=v; };
+  const totalInv = cache.investimentos.reduce((s,i)=>s+pm(i.valor),0);
+  const sid2=(id,v)=>{ const el=document.getElementById(id); if(el) el.textContent=v; };
+  sid2('d-investido', fm(totalInv));
+  sid2('d-investido-sub', `${cache.investimentos.length} investimento(s)`);
+
   sid('d-rec', fm(totalRec)); sid('d-rec-sub', `${recMes.length} lançamentos`);
   sid('d-desp', fm(totalDesp));
   const ds = document.getElementById('d-saldo');
@@ -1587,7 +1684,171 @@ async function delSubcat(id) {
   catch(e){showToast('Erro.','err');}
 }
 
-// ══ RELATÓRIOS ══
+// ══ INVESTIMENTOS ══
+function renderInvestimentos() {
+  const grid = document.getElementById('inv-grid'); if(!grid) return;
+  const invs = cache.investimentos;
+  const total = invs.reduce((s,i)=>s+pm(i.valor),0);
+  const insts = new Set(invs.map(i=>i.inst).filter(Boolean));
+  const sid=(id,v)=>{ const el=document.getElementById(id); if(el) el.textContent=v; };
+  sid('inv-total', fm(total));
+  sid('inv-count', String(invs.length));
+  sid('inv-inst-count', String(insts.size));
+  if(!invs.length){grid.innerHTML='<div style="font-size:.82rem;color:var(--text-3);padding:1rem">Nenhum investimento cadastrado.</div>';return;}
+  grid.innerHTML = invs.map(inv=>`
+    <div class="inv-card-item">
+      <button class="inv-del" onclick="quickDelInv('${inv.id}')">×</button>
+      <div class="inv-inst">${inv.inst||'—'}</div>
+      <div class="inv-tipo">${inv.tipo||'—'}</div>
+      <div class="inv-valor">${fm(inv.valor)}</div>
+      <div class="inv-data">Desde ${inv.data?fd(inv.data):'—'}</div>
+      ${inv.obs?`<div style="font-size:.7rem;color:var(--text-3);margin-top:.375rem">📝 ${inv.obs}</div>`:''}
+      <div class="inv-actions">
+        <button class="btn btn-ghost btn-sm" onclick="editInv('${inv.id}')">✏️ Editar</button>
+        <button class="btn btn-gold btn-sm" onclick="abrirMovInv('${inv.id}','${(inv.inst||'').replace(/'/g,"\\'")}')">± Movimentar</button>
+        <button class="btn btn-ghost btn-sm" onclick="verHistorico('${inv.id}','${(inv.inst||'').replace(/'/g,"\\'")}')">📋 Histórico</button>
+      </div>
+    </div>`).join('');
+}
+
+function filtrarInv(tipo, el) {
+  document.querySelectorAll('#page-investimentos .qf-btn').forEach(b=>b.classList.remove('active')); el.classList.add('active');
+  renderInvestimentos();
+}
+
+function filtrarInvInst(el) {
+  document.querySelectorAll('#page-investimentos .qf-btn').forEach(b=>b.classList.remove('active')); el.classList.add('active');
+  const grid = document.getElementById('inv-grid'); if(!grid) return;
+  const insts = [...new Set(cache.investimentos.map(i=>i.inst).filter(Boolean))];
+  if(!insts.length){grid.innerHTML='<div style="font-size:.82rem;color:var(--text-3);padding:1rem">Nenhum investimento.</div>';return;}
+  grid.innerHTML = insts.map(inst=>{
+    const invs = cache.investimentos.filter(i=>i.inst===inst);
+    const total = invs.reduce((s,i)=>s+pm(i.valor),0);
+    return `<div class="card">
+      <div style="font-size:.82rem;font-weight:700;color:var(--gold);margin-bottom:.75rem">${inst}</div>
+      ${invs.map(inv=>`<div style="display:flex;justify-content:space-between;padding:.375rem 0;border-bottom:1px solid var(--border);font-size:.82rem">
+        <span>${inv.tipo||'—'}</span><span style="font-weight:700;color:var(--gold)">${fm(inv.valor)}</span>
+      </div>`).join('')}
+      <div style="display:flex;justify-content:space-between;padding:.5rem 0 0;font-size:.82rem;font-weight:700">
+        <span>Total ${inst}</span><span style="color:var(--gold)">${fm(total)}</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function saveInv() {
+  const editId = document.getElementById('inv-edit-id').value;
+  const inst = document.getElementById('inv-inst').value.trim();
+  const tipo = document.getElementById('inv-tipo').value.trim();
+  const valor = document.getElementById('inv-valor').value;
+  if(!inst){showToast('Instituição obrigatória.','err');return;}
+  if(!tipo){showToast('Tipo obrigatório.','err');return;}
+  if(!valor){showToast('Valor obrigatório.','err');return;}
+  const data = {inst, tipo, valor, data: document.getElementById('inv-data').value, obs: document.getElementById('inv-obs').value||''};
+  try {
+    if(editId) {
+      await saveDoc('investimentos', editId, data);
+      showToast('Investimento atualizado!');
+    } else {
+      const id = await saveDoc('investimentos', null, data);
+      // Registra criação no histórico
+      await db.collection('investimentos_bev').doc(id||editId).collection('historico').add({
+        tipo: 'criacao', valor: data.valor, obs: data.obs||'Cadastro inicial',
+        data: data.data||today(), criadoEm: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      showToast('Investimento criado!');
+    }
+    closeModal('inv');
+    await loadCollection('investimentos');
+    renderInvestimentos();
+    renderDashboard();
+  } catch(e){ showToast('Erro ao salvar.','err'); console.error(e); }
+}
+
+function editInv(id) {
+  const inv = cache.investimentos.find(x=>x.id===id); if(!inv) return;
+  document.getElementById('inv-edit-id').value = id;
+  document.getElementById('inv-modal-title').textContent = 'Editar Investimento';
+  document.getElementById('inv-del-btn').style.display = 'inline-flex';
+  document.getElementById('inv-inst').value = inv.inst||'';
+  document.getElementById('inv-tipo').value = inv.tipo||'';
+  document.getElementById('inv-valor').value = inv.valor||'';
+  document.getElementById('inv-data').value = inv.data||'';
+  document.getElementById('inv-obs').value = inv.obs||'';
+  document.getElementById('modal-inv').classList.add('open');
+}
+
+async function delInv() {
+  const id = document.getElementById('inv-edit-id').value;
+  if(!id||!confirm('Excluir este investimento?')) return;
+  try { await deleteDoc('investimentos',id); closeModal('inv'); showToast('Excluído.'); renderInvestimentos(); renderDashboard(); }
+  catch(e){ showToast('Erro.','err'); }
+}
+
+async function quickDelInv(id) {
+  if(!confirm('Excluir este investimento?')) return;
+  try { await deleteDoc('investimentos',id); renderInvestimentos(); renderDashboard(); }
+  catch(e){ showToast('Erro.','err'); }
+}
+
+function abrirMovInv(id, inst) {
+  document.getElementById('inv-mov-id').value = id;
+  document.getElementById('inv-mov-title').textContent = `Movimentação — ${inst}`;
+  document.getElementById('inv-mov-valor').value = '';
+  document.getElementById('inv-mov-obs').value = '';
+  document.getElementById('inv-mov-tipo').value = 'aporte';
+  document.getElementById('modal-inv-mov').classList.add('open');
+}
+
+async function confirmarMovInv() {
+  const id = document.getElementById('inv-mov-id').value;
+  const tipo = document.getElementById('inv-mov-tipo').value;
+  const valor = pm(document.getElementById('inv-mov-valor').value);
+  const obs = document.getElementById('inv-mov-obs').value.trim();
+  if(!valor){showToast('Informe um valor.','err');return;}
+  const inv = cache.investimentos.find(x=>x.id===id); if(!inv) return;
+  const novoValor = tipo==='aporte' ? pm(inv.valor)+valor : Math.max(0, pm(inv.valor)-valor);
+  try {
+    await db.collection('investimentos_bev').doc(id).update({
+      valor: String(novoValor.toFixed(2)),
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    await db.collection('investimentos_bev').doc(id).collection('historico').add({
+      tipo, valor: String(valor), obs: obs||'',
+      data: today(), criadoEm: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    inv.valor = String(novoValor.toFixed(2));
+    closeModal('inv-mov');
+    showToast(`${tipo==='aporte'?'Aporte':'Resgate'} de ${fm(valor)} registrado!`);
+    renderInvestimentos(); renderDashboard();
+  } catch(e){ showToast('Erro.','err'); console.error(e); }
+}
+
+async function verHistorico(id, inst) {
+  document.getElementById('inv-hist-title').textContent = `Histórico — ${inst}`;
+  const listaEl = document.getElementById('inv-hist-lista');
+  listaEl.innerHTML = '<div style="font-size:.82rem;color:var(--text-3);text-align:center;padding:1rem">Carregando...</div>';
+  document.getElementById('modal-inv-hist').classList.add('open');
+  try {
+    const snap = await db.collection('investimentos_bev').doc(id).collection('historico').orderBy('criadoEm','desc').get();
+    const items = snap.docs.map(d=>d.data());
+    if(!items.length){listaEl.innerHTML='<div style="font-size:.82rem;color:var(--text-3);text-align:center;padding:1rem">Sem histórico registrado.</div>';return;}
+    listaEl.innerHTML = items.map(h=>{
+      const cls = h.tipo==='aporte'?'inv-hist-aporte':h.tipo==='resgate'?'inv-hist-resgate':'inv-hist-criacao';
+      const label = h.tipo==='aporte'?'Aporte':h.tipo==='resgate'?'Resgate':'Criação';
+      const sinal = h.tipo==='aporte'?'+':h.tipo==='resgate'?'-':'';
+      return `<div class="inv-hist-item">
+        <div>
+          <span class="inv-hist-tipo ${cls}">${label}</span>
+          <span style="font-size:.72rem;color:var(--text-3);margin-left:.5rem">${h.data?fd(h.data):'—'}</span>
+          ${h.obs?`<div style="font-size:.72rem;color:var(--text-2);margin-top:3px">📝 ${h.obs}</div>`:''}
+        </div>
+        <div style="font-weight:700;color:${h.tipo==='resgate'?'var(--red)':h.tipo==='aporte'?'var(--green)':'var(--gold)'}">${sinal}${fm(h.valor)}</div>
+      </div>`;
+    }).join('');
+  } catch(e){ listaEl.innerHTML='<div style="font-size:.82rem;color:var(--red)">Erro ao carregar histórico.</div>'; }
+}
+
 const chartInst={};
 function destroyChart(id){if(chartInst[id]){try{chartInst[id].destroy();}catch(e){}delete chartInst[id];}}
 let _mensalTodosCache=[];
@@ -1688,6 +1949,42 @@ function gerarFiltrado() {
   const contaId=document.getElementById('fil-conta').value;
   const ini=document.getElementById('fil-ini').value;
   const fim=document.getElementById('fil-fim').value;
+
+  // Investimentos
+  if(tipo==='investimento') {
+    let invs = cache.investimentos.map(i=>({...i,_tipo:'investimento'}));
+    if(ini) invs=invs.filter(i=>i.data&&i.data>=ini);
+    if(fim) invs=invs.filter(i=>i.data&&i.data<=fim);
+    const total=invs.reduce((s,i)=>s+pm(i.valor),0);
+    document.getElementById('filtrado-vazio').style.display='none';
+    document.getElementById('filtrado-resultado').style.display='block';
+    document.getElementById('filtrado-count-label').textContent=`${invs.length} investimento(s)`;
+    document.getElementById('ind-filtrado').innerHTML=`
+      <div class="ind"><div class="ind-label">Total Investido</div><div class="ind-val" style="color:var(--gold)">${fm(total)}</div></div>
+      <div class="ind"><div class="ind-label">Qtd</div><div class="ind-val">${invs.length}</div></div>
+      <div class="ind"><div class="ind-label">Instituições</div><div class="ind-val">${new Set(invs.map(i=>i.inst).filter(Boolean)).size}</div></div>
+      <div class="ind"><div class="ind-label">Tipos</div><div class="ind-val">${new Set(invs.map(i=>i.tipo).filter(Boolean)).size}</div></div>`;
+    // Charts por instituição
+    setTimeout(()=>{
+      const iMap={};invs.forEach(i=>{const k=i.inst||'Outro';iMap[k]=(iMap[k]||0)+pm(i.valor);});
+      const il=Object.keys(iMap);
+      destroyChart('chart-fil-bar');
+      chartInst['chart-fil-bar']=new Chart(document.getElementById('chart-fil-bar'),{type:'bar',data:{labels:il,datasets:[{label:'Valor Investido',data:il.map(k=>iMap[k]),backgroundColor:'rgba(160,120,80,.7)',borderRadius:4}]},options:{responsive:true,plugins:{legend:{position:'top'}},scales:{y:{beginAtZero:true}}}});
+      destroyChart('chart-fil-pizza');
+      chartInst['chart-fil-pizza']=new Chart(document.getElementById('chart-fil-pizza'),{type:'doughnut',data:{labels:il.length?il:['Sem dados'],datasets:[{data:il.length?il.map(k=>iMap[k]):[1],backgroundColor:['rgba(160,120,80,.8)','rgba(59,130,246,.7)','rgba(5,150,105,.7)','rgba(234,179,8,.7)','rgba(220,38,38,.5)'].slice(0,Math.max(il.length,1)),borderWidth:2,borderColor:'#fff'}]},options:{responsive:true,plugins:{legend:{position:'right'}}}});
+    },100);
+    const tabEl=document.getElementById('filtrado-tabela');
+    tabEl.innerHTML=`<div class="dt-head" style="grid-template-columns:2fr 1fr 1fr 1fr"><span>Instituição</span><span>Tipo</span><span>Data</span><span>Valor</span></div>`+
+      invs.map(i=>`<div class="dt-row" style="grid-template-columns:2fr 1fr 1fr 1fr">
+        <span style="font-weight:500">${i.inst||'—'}</span>
+        <span style="color:var(--text-2)">${i.tipo||'—'}</span>
+        <span>${i.data?fd(i.data):'—'}</span>
+        <span style="font-weight:700;color:var(--gold)">${fm(i.valor)}</span>
+      </div>`).join('');
+    showToast(`${invs.length} resultado(s).`);
+    return;
+  }
+
   let rec=cache.receitas.map(r=>({...r,_tipo:'receita'}));
   let desp=cache.despesas.map(d=>({...d,_tipo:'despesa'}));
   if(cat){rec=rec.filter(r=>r.cat===cat);desp=desp.filter(d=>d.cat===cat);}
