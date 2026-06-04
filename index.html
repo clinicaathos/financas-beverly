@@ -845,11 +845,14 @@ body.dark .card,.dark .kpi,.dark .fin-stat,.dark .ind,.dark .conta-card,.dark .m
 <div class="modal-overlay" id="modal-senha" onclick="closeMBg(event,'senha')">
   <div class="modal-box modal-sm">
     <div class="modal-title">Alterar Senha</div>
-    <div class="form-group"><label class="form-label">Nova Senha</label><input class="form-input" type="password" id="nova-senha" placeholder="••••••••"></div>
-    <div class="form-group"><label class="form-label">Confirmar</label><input class="form-input" type="password" id="conf-senha" placeholder="••••••••"></div>
+    <div style="font-size:.72rem;color:var(--text-3);margin-bottom:.875rem">Por segurança, confirme sua senha atual antes de definir a nova.</div>
+    <div class="form-group"><label class="form-label">Senha Atual</label><input class="form-input" type="password" id="senha-atual" placeholder="••••••••"></div>
+    <div class="form-group"><label class="form-label">Nova Senha</label><input class="form-input" type="password" id="nova-senha" placeholder="mínimo 6 caracteres"></div>
+    <div class="form-group"><label class="form-label">Confirmar Nova Senha</label><input class="form-input" type="password" id="conf-senha" placeholder="••••••••"></div>
+    <div id="senha-erro" style="font-size:.75rem;color:var(--red);min-height:1rem;margin-bottom:.25rem"></div>
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="closeModal('senha')">Cancelar</button>
-      <button class="btn btn-gold" onclick="alterarSenha()">Salvar</button>
+      <button class="btn btn-gold" id="senha-salvar-btn" onclick="alterarSenha()">Salvar</button>
     </div>
   </div>
 </div>
@@ -945,11 +948,45 @@ async function doLogin() {
 }
 async function doLogout() { await auth.signOut(); }
 async function alterarSenha() {
-  const nova = document.getElementById('nova-senha').value;
-  const conf = document.getElementById('conf-senha').value;
-  if(nova !== conf) { showToast('As senhas não coincidem.','err'); return; }
-  try { await auth.currentUser.updatePassword(nova); closeModal('senha'); showToast('Senha alterada!'); }
-  catch(e) { showToast('Faça login novamente para alterar a senha.','err'); }
+  const atual  = document.getElementById('senha-atual').value;
+  const nova   = document.getElementById('nova-senha').value;
+  const conf   = document.getElementById('conf-senha').value;
+  const erroEl = document.getElementById('senha-erro');
+  const btn    = document.getElementById('senha-salvar-btn');
+  erroEl.textContent = '';
+
+  if(!atual)            { erroEl.textContent = 'Informe a senha atual.'; return; }
+  if(!nova)             { erroEl.textContent = 'Informe a nova senha.'; return; }
+  if(nova.length < 6)   { erroEl.textContent = 'A nova senha precisa ter pelo menos 6 caracteres.'; return; }
+  if(nova !== conf)     { erroEl.textContent = 'As senhas não coincidem.'; return; }
+  if(nova === atual)    { erroEl.textContent = 'A nova senha deve ser diferente da atual.'; return; }
+
+  btn.textContent = 'Salvando...';
+  btn.disabled = true;
+
+  try {
+    const user = auth.currentUser;
+    // Reautenticar com a senha atual
+    const cred = firebase.auth.EmailAuthProvider.credential(user.email, atual);
+    await user.reauthenticateWithCredential(cred);
+    // Atualizar para a nova senha
+    await user.updatePassword(nova);
+    closeModal('senha');
+    // Limpa os campos
+    ['senha-atual','nova-senha','conf-senha'].forEach(id => document.getElementById(id).value = '');
+    showToast('Senha alterada com sucesso!');
+  } catch(e) {
+    if(e.code === 'auth/wrong-password' || e.code === 'auth/invalid-credential') {
+      erroEl.textContent = 'Senha atual incorreta.';
+    } else if(e.code === 'auth/weak-password') {
+      erroEl.textContent = 'Senha muito fraca. Use pelo menos 6 caracteres.';
+    } else {
+      erroEl.textContent = 'Erro ao alterar a senha. Tente novamente.';
+    }
+  } finally {
+    btn.textContent = 'Salvar';
+    btn.disabled = false;
+  }
 }
 document.getElementById('l-senha').addEventListener('keydown',e=>{ if(e.key==='Enter') doLogin(); });
 document.getElementById('l-email').addEventListener('keydown',e=>{ if(e.key==='Enter') document.getElementById('l-senha').focus(); });
