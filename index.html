@@ -726,7 +726,7 @@ body.dark .card,.dark .kpi,.dark .fin-stat,.dark .ind,.dark .conta-card,.dark .m
           <option value="anual">Anual</option>
         </select>
       </div>
-      <div class="form-group" id="r-rep-fim-grp" style="display:none"><label class="form-label">Repetir até</label><input class="form-input" type="date" id="r-rep-fim"></div>
+      <div class="form-group" id="r-rep-fim-grp" style="display:none"><label class="form-label">Quantas repetições</label><input class="form-input" type="number" id="r-rep-fim" min="1" max="360" placeholder="Ex: 12"></div>
     </div>
     <div class="form-group"><label class="form-label">Observação</label><input class="form-input" id="r-obs" placeholder="Opcional"></div>
     <div class="modal-footer">
@@ -1483,20 +1483,16 @@ function toggleRepRec() {
   const rep=document.getElementById('r-rep').value;
   document.getElementById('r-rep-fim-grp').style.display=rep?'block':'none';
 }
-function gerarDatasRep(vencBase, rep, fim) {
+function gerarDatasRepQtd(vencBase, rep, qtd) {
   const datas=[];
-  const dataFim=fim?new Date(fim+'T12:00:00'):null;
+  const n=parseInt(qtd)||1;
   let cur=new Date(vencBase+'T12:00:00');
-  let seguranca=0;
-  while(seguranca<500) {
-    seguranca++;
+  for(let i=0;i<n;i++) {
     if(rep==='diario') cur.setDate(cur.getDate()+1);
     else if(rep==='semanal') cur.setDate(cur.getDate()+7);
     else if(rep==='mensal') cur.setMonth(cur.getMonth()+1);
     else if(rep==='anual') cur.setFullYear(cur.getFullYear()+1);
-    if(dataFim && cur>dataFim) break;
     datas.push(cur.toISOString().split('T')[0]);
-    if(!dataFim) break; // sem fim definido, gera só 1 próxima
   }
   return datas;
 }
@@ -1508,14 +1504,15 @@ async function saveRec() {
   if(!val){showToast('Valor obrigatório.','err');return;}
   const venc=document.getElementById('r-venc').value;
   const rep=document.getElementById('r-rep').value;
-  const repFim=document.getElementById('r-rep-fim').value;
+  const repQtd=document.getElementById('r-rep-fim').value;
   const data={desc,cat:document.getElementById('r-cat').value,subcat:document.getElementById('r-subcat').value||'',val,conta:document.getElementById('r-conta').value||'',venc,obs:document.getElementById('r-obs').value||'',rep:rep||'',mes:venc?new Date(venc+'T12:00:00').getMonth():mesAtual(),ano:venc?new Date(venc+'T12:00:00').getFullYear():anoAtual()};
   if(!editId) data.status='Pendente';
   try {
     await saveDoc('receitas', editId||null, data);
     // Gerar lançamentos futuros de repetição (apenas em novo)
     if(!editId && rep && venc) {
-      const datas=gerarDatasRep(venc,rep,repFim);
+      const qtd=parseInt(repQtd)||1;
+      const datas=gerarDatasRepQtd(venc,rep,qtd);
       for(const d of datas) {
         const clone={...data,venc:d,status:'Pendente',rep:rep,mes:new Date(d+'T12:00:00').getMonth(),ano:new Date(d+'T12:00:00').getFullYear()};
         await saveDoc('receitas',null,clone);
@@ -1587,7 +1584,8 @@ async function saveDesp() {
       await saveDoc('despesas', editId||null, data);
       // Gerar lançamentos futuros de repetição (apenas em novo)
       if(!editId && rep && rep!=='parcelado' && venc) {
-        const datas=gerarDatasRep(venc,rep,repFim);
+        const qtd=parseInt(repFim)||1;
+        const datas=gerarDatasRepQtd(venc,rep,qtd);
         for(const d of datas) {
           const clone={...data,venc:d,status:'Pendente',rep:rep,mes:new Date(d+'T12:00:00').getMonth(),ano:new Date(d+'T12:00:00').getFullYear()};
           await saveDoc('despesas',null,clone);
