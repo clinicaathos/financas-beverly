@@ -488,7 +488,7 @@ body.dark .card,.dark .kpi,.dark .fin-stat,.dark .ind,.dark .conta-card,.dark .m
             <div class="cards-mobile" id="desp-cards"></div>
           </div>
           <div class="tab-panel" id="tab-mov">
-            <div style="font-size:.72rem;color:var(--text-3);margin-bottom:.75rem">📋 Lançamentos pagos ou com vencimento passado.</div>
+            <div style="font-size:.72rem;color:var(--text-3);margin-bottom:.75rem">📋 Lançamentos marcados como <strong>Pago</strong>, com data de pagamento registrada.</div>
             <div class="table-desktop" id="mov-table"></div>
             <div class="cards-mobile" id="mov-cards"></div>
           </div>
@@ -716,6 +716,18 @@ body.dark .card,.dark .kpi,.dark .fin-stat,.dark .ind,.dark .conta-card,.dark .m
       <div class="form-group"><label class="form-label">Conta</label><select class="form-select" id="r-conta"><option value="">Selecionar...</option></select></div>
     </div>
     <div class="form-group"><label class="form-label">Subcategoria</label><select class="form-select" id="r-subcat"><option value="">Nenhuma</option></select></div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Repetição</label>
+        <select class="form-select" id="r-rep" onchange="toggleRepRec()">
+          <option value="">Sem repetição</option>
+          <option value="diario">Diário</option>
+          <option value="semanal">Semanal</option>
+          <option value="mensal">Mensal</option>
+          <option value="anual">Anual</option>
+        </select>
+      </div>
+      <div class="form-group" id="r-rep-fim-grp" style="display:none"><label class="form-label">Repetir até</label><input class="form-input" type="date" id="r-rep-fim"></div>
+    </div>
     <div class="form-group"><label class="form-label">Observação</label><input class="form-input" id="r-obs" placeholder="Opcional"></div>
     <div class="modal-footer">
       <button class="btn btn-danger btn-sm" id="r-del-btn" style="display:none" onclick="delRec()">Excluir</button>
@@ -739,6 +751,23 @@ body.dark .card,.dark .kpi,.dark .fin-stat,.dark .ind,.dark .conta-card,.dark .m
       <div class="form-group"><label class="form-label">Conta</label><select class="form-select" id="d-conta"><option value="">Selecionar...</option></select></div>
     </div>
     <div class="form-group"><label class="form-label">Subcategoria</label><select class="form-select" id="d-subcat"><option value="">Nenhuma</option></select></div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Repetição</label>
+        <select class="form-select" id="d-rep" onchange="toggleRepDesp()">
+          <option value="">Sem repetição</option>
+          <option value="diario">Diário</option>
+          <option value="semanal">Semanal</option>
+          <option value="mensal">Mensal</option>
+          <option value="anual">Anual</option>
+          <option value="parcelado">Parcelado</option>
+        </select>
+      </div>
+      <div class="form-group" id="d-rep-fim-grp" style="display:none"><label class="form-label">Repetir até</label><input class="form-input" type="date" id="d-rep-fim"></div>
+    </div>
+    <div class="form-group" id="d-parc-grp" style="display:none">
+      <label class="form-label">Número de parcelas</label>
+      <input class="form-input" type="number" id="d-parc" min="2" max="60" placeholder="Ex: 12">
+    </div>
     <div class="form-group"><label class="form-label">Observação</label><input class="form-input" id="d-obs" placeholder="Opcional"></div>
     <div class="modal-footer">
       <button class="btn btn-danger btn-sm" id="d-del-btn" style="display:none" onclick="delDesp()">Excluir</button>
@@ -868,6 +897,7 @@ body.dark .card,.dark .kpi,.dark .fin-stat,.dark .ind,.dark .conta-card,.dark .m
       <div class="form-group"><label class="form-label">Valor Investido (R$)</label><input class="form-input" id="inv-valor" placeholder="0,00" type="text"></div>
       <div class="form-group"><label class="form-label">Data</label><input class="form-input" type="date" id="inv-data"></div>
     </div>
+    <div class="form-group"><label class="form-label">Validade <span style="font-weight:400;color:var(--text-3)">(opcional)</span></label><input class="form-input" type="date" id="inv-validade"></div>
     <div class="form-group"><label class="form-label">Observações</label><textarea class="form-textarea" id="inv-obs" placeholder="Informações adicionais..." style="min-height:60px"></textarea></div>
     <div class="modal-footer">
       <button class="btn btn-danger btn-sm" id="inv-del-btn" style="display:none" onclick="delInv()">Excluir</button>
@@ -1080,6 +1110,10 @@ function openModal(id) {
   if(title && id==='orc') title.textContent='Nova Categoria de Orçamento';
   updateContaSelects();
   updateSubcatSelects();
+  // Reset campos de repetição/parcelas
+  if(id==='rec') { const r=document.getElementById('r-rep'); if(r){r.value='';} document.getElementById('r-rep-fim-grp').style.display='none'; document.getElementById('r-rep-fim').value=''; }
+  if(id==='desp') { const d=document.getElementById('d-rep'); if(d){d.value='';} document.getElementById('d-rep-fim-grp').style.display='none'; document.getElementById('d-rep-fim').value=''; document.getElementById('d-parc-grp').style.display='none'; document.getElementById('d-parc').value=''; }
+  if(id==='inv') { document.getElementById('inv-validade').value=''; }
   el.classList.add('open');
 }
 function closeModal(id) { document.getElementById('modal-'+id)?.classList.remove('open'); }
@@ -1177,16 +1211,38 @@ function renderDashboard() {
   const alertaDias = parseInt(document.getElementById('cfg-alerta-dias')?.value)||3;
   const limitDate = new Date(new Date().getTime()+alertaDias*86400000).toISOString().split('T')[0];
   const alertas = cache.despesas.filter(d=>d.status!=='Pago'&&d.venc&&d.venc<=limitDate);
-  sid('d-alertas-n', String(alertas.length));
+  // Alertas de investimento com validade próxima (2 dias fixo)
+  const hoje=new Date(); hoje.setHours(0,0,0,0);
+  const invAlerts=cache.investimentos.filter(inv=>{
+    if(!inv.validade) return false;
+    const dv=new Date(inv.validade+'T12:00:00');
+    const diff=Math.ceil((dv-hoje)/(1000*60*60*24));
+    return diff<=2;
+  });
+  const totalAlertas=alertas.length+invAlerts.length;
+  sid('d-alertas-n', String(totalAlertas));
   const da = document.getElementById('d-alertas');
-  if(da) da.innerHTML = alertas.length ? alertas.slice(0,5).map(d=>{
-    const dias = Math.floor((new Date(d.venc+'T12:00:00')-new Date())/86400000);
-    const label = dias<0?`Venceu há ${Math.abs(dias)} dia(s)`:dias===0?'Vence hoje':`Vence em ${dias} dia(s)`;
-    return `<div style="display:flex;justify-content:space-between;padding:.45rem 0;border-bottom:1px solid var(--border);font-size:.8rem">
-      <span style="color:${dias<=0?'var(--red)':'var(--yellow)'}">${dias<=0?'⚠️':'🔔'} ${d.desc}</span>
-      <div style="text-align:right"><div style="font-weight:700;color:var(--red)">${fm(d.val)}</div><div style="font-size:.68rem;color:var(--text-3)">${label}</div></div>
-    </div>`;
-  }).join('') : '<div style="font-size:.8rem;color:var(--text-3);text-align:center;padding:1rem">Nenhum alerta</div>';
+  if(da) {
+    let html='';
+    if(alertas.length) html+=alertas.slice(0,4).map(d=>{
+      const dias = Math.floor((new Date(d.venc+'T12:00:00')-new Date())/86400000);
+      const label = dias<0?`Venceu há ${Math.abs(dias)} dia(s)`:dias===0?'Vence hoje':`Vence em ${dias} dia(s)`;
+      return `<div style="display:flex;justify-content:space-between;padding:.45rem 0;border-bottom:1px solid var(--border);font-size:.8rem">
+        <span style="color:${dias<=0?'var(--red)':'var(--yellow)'}">${dias<=0?'⚠️':'🔔'} ${d.desc}</span>
+        <div style="text-align:right"><div style="font-weight:700;color:var(--red)">${fm(d.val)}</div><div style="font-size:.68rem;color:var(--text-3)">${label}</div></div>
+      </div>`;
+    }).join('');
+    if(invAlerts.length) html+=invAlerts.map(inv=>{
+      const dv=new Date(inv.validade+'T12:00:00');
+      const diff=Math.ceil((dv-hoje)/(1000*60*60*24));
+      const label=diff<0?'Vencido':diff===0?'Vence hoje':`Vence em ${diff} dia(s)`;
+      return `<div style="display:flex;justify-content:space-between;padding:.45rem 0;border-bottom:1px solid var(--border);font-size:.8rem">
+        <span style="color:var(--yellow)">📈 ${inv.inst||'Investimento'} — ${inv.tipo||''}</span>
+        <div style="text-align:right"><div style="font-weight:700;color:var(--yellow)">${fm(inv.valor)}</div><div style="font-size:.68rem;color:var(--text-3)">${label}</div></div>
+      </div>`;
+    }).join('');
+    da.innerHTML=html||'<div style="font-size:.8rem;color:var(--text-3);text-align:center;padding:1rem">Nenhum alerta</div>';
+  }
 
   // Metas
   const ativas = cache.metas.filter(m=>pm(m.guardado)<pm(m.alvo));
@@ -1303,21 +1359,23 @@ function renderDespTable(list) {
 
 function renderMovTable() {
   const t=document.getElementById('mov-table'),m=document.getElementById('mov-cards');
-  const rec=cache.receitas.map(r=>({...r,_tipo:'Receita'})).filter(r=>r.status==='Pago'||r.venc<=today());
-  const desp=cache.despesas.map(d=>({...d,_tipo:'Despesa'})).filter(d=>d.status==='Pago'||d.venc<=today());
-  const todos=[...rec,...desp].sort((a,b)=>(a.venc||'').localeCompare(b.venc||''));
-  if(!todos.length){if(t)t.innerHTML='<div style="padding:1rem;font-size:.82rem;color:var(--text-3);text-align:center">Nenhum lançamento.</div>';if(m)m.innerHTML='';return;}
-  if(t)t.innerHTML=`<div class="data-table"><div class="dt-head" style="grid-template-columns:2fr 1fr 1fr 1fr 1fr"><span>Descrição</span><span>Tipo</span><span>Categoria</span><span>Data</span><span>Valor</span></div>`+
-    todos.map(x=>`<div class="dt-row" style="grid-template-columns:2fr 1fr 1fr 1fr 1fr">
+  const rec=cache.receitas.map(r=>({...r,_tipo:'Receita'})).filter(r=>r.status==='Pago');
+  const desp=cache.despesas.map(d=>({...d,_tipo:'Despesa'})).filter(d=>d.status==='Pago');
+  const todos=[...rec,...desp].sort((a,b)=>((b.dataPagamento||b.venc)||'').localeCompare((a.dataPagamento||a.venc)||''));
+  if(!todos.length){if(t)t.innerHTML='<div style="padding:1rem;font-size:.82rem;color:var(--text-3);text-align:center">Nenhum lançamento pago.</div>';if(m)m.innerHTML='';return;}
+  if(t)t.innerHTML=`<div class="data-table"><div class="dt-head" style="grid-template-columns:2fr 1fr 1fr 1fr 1fr 1fr"><span>Descrição</span><span>Tipo</span><span>Categoria</span><span>Vencimento</span><span>Pagamento</span><span>Valor</span></div>`+
+    todos.map(x=>`<div class="dt-row" style="grid-template-columns:2fr 1fr 1fr 1fr 1fr 1fr">
       <span>${x.desc||'—'}${x.subcat?` <span style="font-size:.65rem;color:var(--text-3)">· ${x.subcat}</span>`:''}</span>
       <span><span class="badge ${x._tipo==='Receita'?'bg-green':'bg-red'}" style="font-size:.6rem">${x._tipo}</span></span>
-      <span>${x.cat||'—'}</span><span>${fd(x.venc)}</span>
+      <span>${x.cat||'—'}</span>
+      <span style="color:var(--text-3)">${fd(x.venc)}</span>
+      <span style="font-weight:600;color:var(--text)">${x.dataPagamento?fd(x.dataPagamento):'—'}</span>
       <span style="font-weight:700;color:${x._tipo==='Receita'?'var(--green)':'var(--red)'}">${fm(x.val)}</span>
     </div>`).join('')+'</div>';
   if(m)m.innerHTML=todos.map(x=>`
     <div class="mob-card">
       <div class="mob-top"><div class="mob-name">${x.desc} <span class="badge ${x._tipo==='Receita'?'bg-green':'bg-red'}" style="font-size:.6rem">${x._tipo}</span></div><div class="mob-val" style="color:${x._tipo==='Receita'?'var(--green)':'var(--red)'}">${fm(x.val)}</div></div>
-      <div class="mob-meta"><span>${x.cat}</span>${x.venc?`<span>📅 ${fd(x.venc)}</span>`:''}</div>
+      <div class="mob-meta"><span>${x.cat}</span>${x.dataPagamento?`<span>✅ ${fd(x.dataPagamento)}</span>`:''}</div>
     </div>`).join('');
 }
 
@@ -1380,17 +1438,27 @@ function switchRelatTab(id,el) {
 // ══ STATUS TOGGLE ══
 async function toggleRec(id) {
   const r=cache.receitas.find(x=>x.id===id); if(!r) return;
-  r.status=r.status==='Pago'?'Pendente':'Pago';
-  try { await db.collection('receitas_bev').doc(id).update({status:r.status,updatedAt:firebase.firestore.FieldValue.serverTimestamp()}); }
+  const novoStatus=r.status==='Pago'?'Pendente':'Pago';
+  const updateData={status:novoStatus,updatedAt:firebase.firestore.FieldValue.serverTimestamp()};
+  if(novoStatus==='Pago') updateData.dataPagamento=today();
+  else updateData.dataPagamento='';
+  r.status=novoStatus;
+  if(novoStatus==='Pago') r.dataPagamento=today(); else r.dataPagamento='';
+  try { await db.collection('receitas_bev').doc(id).update(updateData); }
   catch(e) { showToast('Erro ao atualizar.','err'); return; }
-  renderLancamentos(); renderDashboard(); showToast(`Marcado como ${r.status}`);
+  renderLancamentos(); renderDashboard(); showToast(`Marcado como ${novoStatus}`);
 }
 async function toggleDesp(id) {
   const d=cache.despesas.find(x=>x.id===id); if(!d) return;
-  d.status=d.status==='Pago'?'Pendente':'Pago';
-  try { await db.collection('despesas_bev').doc(id).update({status:d.status,updatedAt:firebase.firestore.FieldValue.serverTimestamp()}); }
+  const novoStatus=d.status==='Pago'?'Pendente':'Pago';
+  const updateData={status:novoStatus,updatedAt:firebase.firestore.FieldValue.serverTimestamp()};
+  if(novoStatus==='Pago') updateData.dataPagamento=today();
+  else updateData.dataPagamento='';
+  d.status=novoStatus;
+  if(novoStatus==='Pago') d.dataPagamento=today(); else d.dataPagamento='';
+  try { await db.collection('despesas_bev').doc(id).update(updateData); }
   catch(e) { showToast('Erro ao atualizar.','err'); return; }
-  renderLancamentos(); renderDashboard(); showToast(`Marcado como ${d.status}`);
+  renderLancamentos(); renderDashboard(); showToast(`Marcado como ${novoStatus}`);
 }
 
 // ══ SWIPE ══
@@ -1411,6 +1479,27 @@ function initSwipe() {
 }
 
 // ══ RECEITAS CRUD ══
+function toggleRepRec() {
+  const rep=document.getElementById('r-rep').value;
+  document.getElementById('r-rep-fim-grp').style.display=rep?'block':'none';
+}
+function gerarDatasRep(vencBase, rep, fim) {
+  const datas=[];
+  const dataFim=fim?new Date(fim+'T12:00:00'):null;
+  let cur=new Date(vencBase+'T12:00:00');
+  let seguranca=0;
+  while(seguranca<500) {
+    seguranca++;
+    if(rep==='diario') cur.setDate(cur.getDate()+1);
+    else if(rep==='semanal') cur.setDate(cur.getDate()+7);
+    else if(rep==='mensal') cur.setMonth(cur.getMonth()+1);
+    else if(rep==='anual') cur.setFullYear(cur.getFullYear()+1);
+    if(dataFim && cur>dataFim) break;
+    datas.push(cur.toISOString().split('T')[0]);
+    if(!dataFim) break; // sem fim definido, gera só 1 próxima
+  }
+  return datas;
+}
 async function saveRec() {
   const editId=document.getElementById('rec-edit-id').value;
   const desc=document.getElementById('r-desc').value.trim();
@@ -1418,11 +1507,22 @@ async function saveRec() {
   if(!desc){showToast('Descrição obrigatória.','err');return;}
   if(!val){showToast('Valor obrigatório.','err');return;}
   const venc=document.getElementById('r-venc').value;
-  const data={desc,cat:document.getElementById('r-cat').value,subcat:document.getElementById('r-subcat').value||'',val,conta:document.getElementById('r-conta').value||'',venc,obs:document.getElementById('r-obs').value||'',mes:venc?new Date(venc+'T12:00:00').getMonth():mesAtual(),ano:venc?new Date(venc+'T12:00:00').getFullYear():anoAtual()};
+  const rep=document.getElementById('r-rep').value;
+  const repFim=document.getElementById('r-rep-fim').value;
+  const data={desc,cat:document.getElementById('r-cat').value,subcat:document.getElementById('r-subcat').value||'',val,conta:document.getElementById('r-conta').value||'',venc,obs:document.getElementById('r-obs').value||'',rep:rep||'',mes:venc?new Date(venc+'T12:00:00').getMonth():mesAtual(),ano:venc?new Date(venc+'T12:00:00').getFullYear():anoAtual()};
   if(!editId) data.status='Pendente';
   try {
     await saveDoc('receitas', editId||null, data);
+    // Gerar lançamentos futuros de repetição (apenas em novo)
+    if(!editId && rep && venc) {
+      const datas=gerarDatasRep(venc,rep,repFim);
+      for(const d of datas) {
+        const clone={...data,venc:d,status:'Pendente',rep:rep,mes:new Date(d+'T12:00:00').getMonth(),ano:new Date(d+'T12:00:00').getFullYear()};
+        await saveDoc('receitas',null,clone);
+      }
+    }
     closeModal('rec'); showToast(editId?'Receita atualizada!':'Receita lançada!');
+    await loadCollection('receitas');
     renderLancamentos(); renderDashboard();
   } catch(e) { showToast('Erro ao salvar.','err'); console.error(e); }
 }
@@ -1436,6 +1536,8 @@ function editRec(id) {
   document.getElementById('r-val').value=r.val||'';
   document.getElementById('r-venc').value=r.venc||'';
   document.getElementById('r-obs').value=r.obs||'';
+  const rRep=document.getElementById('r-rep'); if(rRep) { rRep.value=r.rep||''; toggleRepRec(); }
+  document.getElementById('r-rep-fim').value='';
   updateContaSelects(); updateSubcatSelects();
   setTimeout(()=>{ document.getElementById('r-conta').value=r.conta||''; document.getElementById('r-subcat').value=r.subcat||''; },50);
   document.getElementById('modal-rec').classList.add('open');
@@ -1453,6 +1555,11 @@ async function quickDelRec(id) {
 }
 
 // ══ DESPESAS CRUD ══
+function toggleRepDesp() {
+  const rep=document.getElementById('d-rep').value;
+  document.getElementById('d-rep-fim-grp').style.display=(rep&&rep!=='parcelado')?'block':'none';
+  document.getElementById('d-parc-grp').style.display=rep==='parcelado'?'block':'none';
+}
 async function saveDesp() {
   const editId=document.getElementById('desp-edit-id').value;
   const desc=document.getElementById('d-desc').value.trim();
@@ -1460,11 +1567,35 @@ async function saveDesp() {
   if(!desc){showToast('Descrição obrigatória.','err');return;}
   if(!val){showToast('Valor obrigatório.','err');return;}
   const venc=document.getElementById('d-venc').value;
-  const data={desc,cat:document.getElementById('d-cat').value,subcat:document.getElementById('d-subcat').value||'',val,conta:document.getElementById('d-conta').value||'',venc,obs:document.getElementById('d-obs').value||'',mes:venc?new Date(venc+'T12:00:00').getMonth():mesAtual(),ano:venc?new Date(venc+'T12:00:00').getFullYear():anoAtual()};
+  const rep=document.getElementById('d-rep').value;
+  const repFim=document.getElementById('d-rep-fim').value;
+  const parcN=parseInt(document.getElementById('d-parc').value)||0;
+  const data={desc,cat:document.getElementById('d-cat').value,subcat:document.getElementById('d-subcat').value||'',val,conta:document.getElementById('d-conta').value||'',venc,obs:document.getElementById('d-obs').value||'',rep:rep||'',mes:venc?new Date(venc+'T12:00:00').getMonth():mesAtual(),ano:venc?new Date(venc+'T12:00:00').getFullYear():anoAtual()};
   if(!editId) data.status='Pendente';
   try {
-    await saveDoc('despesas', editId||null, data);
-    closeModal('desp'); showToast(editId?'Despesa atualizada!':'Despesa lançada!');
+    if(!editId && rep==='parcelado' && parcN>=2 && venc) {
+      // Parcelado: gera N parcelas, cada uma no mês seguinte
+      for(let i=0;i<parcN;i++) {
+        const d=new Date(venc+'T12:00:00');
+        d.setMonth(d.getMonth()+i);
+        const dStr=d.toISOString().split('T')[0];
+        const clone={...data,desc:`${desc} - ${i+1}/${parcN}`,venc:dStr,status:'Pendente',rep:'parcelado',parcela:`${i+1}/${parcN}`,mes:d.getMonth(),ano:d.getFullYear()};
+        await saveDoc('despesas',null,clone);
+      }
+      closeModal('desp'); showToast(`${parcN} parcelas criadas!`);
+    } else {
+      await saveDoc('despesas', editId||null, data);
+      // Gerar lançamentos futuros de repetição (apenas em novo)
+      if(!editId && rep && rep!=='parcelado' && venc) {
+        const datas=gerarDatasRep(venc,rep,repFim);
+        for(const d of datas) {
+          const clone={...data,venc:d,status:'Pendente',rep:rep,mes:new Date(d+'T12:00:00').getMonth(),ano:new Date(d+'T12:00:00').getFullYear()};
+          await saveDoc('despesas',null,clone);
+        }
+      }
+      closeModal('desp'); showToast(editId?'Despesa atualizada!':'Despesa lançada!');
+    }
+    await loadCollection('despesas');
     renderLancamentos(); renderDashboard();
   } catch(e) { showToast('Erro ao salvar.','err'); console.error(e); }
 }
@@ -1478,6 +1609,7 @@ function editDesp(id) {
   document.getElementById('d-val').value=d.val||'';
   document.getElementById('d-venc').value=d.venc||'';
   document.getElementById('d-obs').value=d.obs||'';
+  const dRep=document.getElementById('d-rep'); if(dRep) { dRep.value=d.rep||''; toggleRepDesp(); }
   updateContaSelects(); updateSubcatSelects();
   setTimeout(()=>{ document.getElementById('d-conta').value=d.conta||''; document.getElementById('d-subcat').value=d.subcat||''; },50);
   document.getElementById('modal-desp').classList.add('open');
@@ -1618,11 +1750,12 @@ async function confirmarAporte() {
 // ══ ORÇAMENTO ══
 function renderOrcamento() {
   const list=document.getElementById('orc-list'); if(!list) return;
-  const despMes=cache.despesas.filter(d=>isMesAtual(d.venc));
+  // Apenas despesas pagas no mês atual contam para o orçamento
+  const despMesPagas=cache.despesas.filter(d=>isMesAtual(d.venc)&&d.status==='Pago');
   const alertaOrc=parseInt(document.getElementById('cfg-alerta-orc')?.value)||80;
   list.innerHTML=cache.orcamentos.length?cache.orcamentos.map(o=>{
     const limite=pm(o.limite)||0;
-    const gasto=despMes.filter(d=>d.subcat===o.nome||d.subcat===o.subcat).reduce((s,d)=>s+pm(d.val),0);
+    const gasto=despMesPagas.filter(d=>d.subcat===o.nome||d.subcat===o.subcat).reduce((s,d)=>s+pm(d.val),0);
     const pct=limite>0?Math.min(100,Math.round(gasto/limite*100)):0;
     const cls=pct>=100?'over':pct>=alertaOrc?'warn':'ok';
     return `<div class="orc-card">
@@ -1634,7 +1767,7 @@ function renderOrcamento() {
       </div>
       <div class="orc-bar"><div class="orc-fill ${cls}" style="width:${pct}%"></div></div>
       <div class="orc-bot">
-        <span>Gasto: <strong style="color:${cls==='over'?'var(--red)':cls==='warn'?'var(--yellow)':'var(--text)'}">${fm(gasto)}</strong></span>
+        <span>Pago: <strong style="color:${cls==='over'?'var(--red)':cls==='warn'?'var(--yellow)':'var(--text)'}">${fm(gasto)}</strong></span>
         <span>Limite: ${fm(limite)}</span>
         <span style="color:${gasto>limite?'var(--red)':'var(--green)'}">${gasto<=limite?'Disponível: '+fm(limite-gasto):'Excedeu: '+fm(gasto-limite)}</span>
       </div>
@@ -1725,10 +1858,26 @@ function renderInvestimentos() {
   sid('inv-count', String(invs.length));
   sid('inv-inst-count', String(insts.size));
   if(!invs.length){grid.innerHTML='<div style="font-size:.82rem;color:var(--text-3);padding:1rem">Nenhum investimento cadastrado.</div>';return;}
-  grid.innerHTML = invs.map(inv=>`
-    <div class="inv-card-item">
+  const hoje=new Date(); hoje.setHours(0,0,0,0);
+  grid.innerHTML = invs.map(inv=>{
+    let validadeBadge='';
+    let cardBorder='';
+    if(inv.validade) {
+      const dv=new Date(inv.validade+'T12:00:00');
+      const diff=Math.ceil((dv-hoje)/(1000*60*60*24));
+      if(diff<0) {
+        validadeBadge=`<span class="badge bg-red" style="margin-left:.375rem">Vencido</span>`;
+        cardBorder='border:2px solid var(--red);';
+      } else if(diff<=2) {
+        validadeBadge=`<span class="badge bg-yellow" style="margin-left:.375rem">Vence em ${diff}d ⚠️</span>`;
+        cardBorder='border:2px solid var(--yellow);';
+      } else {
+        validadeBadge=`<span style="font-size:.68rem;color:var(--text-3);margin-left:.25rem">val. ${fd(inv.validade)}</span>`;
+      }
+    }
+    return `<div class="inv-card-item" style="${cardBorder}">
       <button class="inv-del" onclick="quickDelInv('${inv.id}')">×</button>
-      <div class="inv-inst">${inv.inst||'—'}</div>
+      <div class="inv-inst">${inv.inst||'—'}${validadeBadge}</div>
       <div class="inv-tipo">${inv.tipo||'—'}</div>
       <div class="inv-valor">${fm(inv.valor)}</div>
       <div class="inv-data">Desde ${inv.data?fd(inv.data):'—'}</div>
@@ -1738,7 +1887,8 @@ function renderInvestimentos() {
         <button class="btn btn-gold btn-sm" onclick="abrirMovInv('${inv.id}','${(inv.inst||'').replace(/'/g,"\\'")}')">± Movimentar</button>
         <button class="btn btn-ghost btn-sm" onclick="verHistorico('${inv.id}','${(inv.inst||'').replace(/'/g,"\\'")}')">📋 Histórico</button>
       </div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 }
 
 function filtrarInv(tipo, el) {
@@ -1774,7 +1924,7 @@ async function saveInv() {
   if(!inst){showToast('Instituição obrigatória.','err');return;}
   if(!tipo){showToast('Tipo obrigatório.','err');return;}
   if(!valor){showToast('Valor obrigatório.','err');return;}
-  const data = {inst, tipo, valor, data: document.getElementById('inv-data').value, obs: document.getElementById('inv-obs').value||''};
+  const data = {inst, tipo, valor, data: document.getElementById('inv-data').value, obs: document.getElementById('inv-obs').value||'', validade: document.getElementById('inv-validade').value||''};
   try {
     if(editId) {
       await saveDoc('investimentos', editId, data);
@@ -1805,6 +1955,7 @@ function editInv(id) {
   document.getElementById('inv-valor').value = inv.valor||'';
   document.getElementById('inv-data').value = inv.data||'';
   document.getElementById('inv-obs').value = inv.obs||'';
+  document.getElementById('inv-validade').value = inv.validade||'';
   document.getElementById('modal-inv').classList.add('open');
 }
 
