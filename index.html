@@ -483,12 +483,38 @@ body.dark .card,.dark .kpi,.dark .fin-stat,.dark .ind,.dark .conta-card,.dark .m
               <button class="qf-btn" onclick="filtrarDesp('vencido',this)">Vencidos</button>
               <button class="qf-btn" onclick="filtrarDesp('mes',this)">Este mês</button>
             </div>
+            <div style="display:flex;gap:.5rem;margin-bottom:.875rem;flex-wrap:wrap;align-items:center">
+              <label class="form-label" style="margin:0;white-space:nowrap">De:</label>
+              <input type="date" class="form-input" id="pagar-ini" style="width:auto;flex:1;min-width:130px" onchange="filtrarDespData()">
+              <label class="form-label" style="margin:0;white-space:nowrap">Até:</label>
+              <input type="date" class="form-input" id="pagar-fim" style="width:auto;flex:1;min-width:130px" onchange="filtrarDespData()">
+              <button class="btn btn-ghost btn-sm" onclick="limparFiltrosPagar()">Limpar</button>
+            </div>
+            <div class="form-row" style="margin-bottom:.875rem">
+              <div class="form-group" style="margin:0"><label class="form-label">Categoria</label>
+                <select class="form-select" id="pagar-cat" onchange="filtrarDespData()">
+                  <option value="">Todas</option>
+                  <option>Fixo</option><option>Variável</option><option>Extra</option>
+                </select>
+              </div>
+              <div class="form-group" style="margin:0"><label class="form-label">Subcategoria</label>
+                <select class="form-select" id="pagar-subcat" onchange="filtrarDespData()"><option value="">Todas</option></select>
+              </div>
+            </div>
             <div class="search-wrap"><span class="search-icon">🔍</span><input class="search-input" placeholder="Buscar despesa..." oninput="buscarDesp(this.value)"></div>
             <div class="table-desktop" id="desp-table"></div>
             <div class="cards-mobile" id="desp-cards"></div>
           </div>
           <div class="tab-panel" id="tab-mov">
             <div style="font-size:.72rem;color:var(--text-3);margin-bottom:.75rem">📋 Lançamentos marcados como <strong>Pago</strong>, com data de pagamento registrada.</div>
+            <div class="search-wrap"><span class="search-icon">🔍</span><input class="search-input" placeholder="Buscar na movimentação..." oninput="buscarMov(this.value)" id="mov-search"></div>
+            <div style="display:flex;gap:.5rem;margin-bottom:.875rem;flex-wrap:wrap;align-items:center">
+              <label class="form-label" style="margin:0;white-space:nowrap">De:</label>
+              <input type="date" class="form-input" id="mov-ini" style="width:auto;flex:1;min-width:130px" onchange="filtrarMovData()">
+              <label class="form-label" style="margin:0;white-space:nowrap">Até:</label>
+              <input type="date" class="form-input" id="mov-fim" style="width:auto;flex:1;min-width:130px" onchange="filtrarMovData()">
+              <button class="btn btn-ghost btn-sm" onclick="limparFiltrosMov()">Limpar</button>
+            </div>
             <div class="table-desktop" id="mov-table"></div>
             <div class="cards-mobile" id="mov-cards"></div>
           </div>
@@ -1175,6 +1201,8 @@ function updateSubcatSelects() {
   if(rEl) rEl.innerHTML = '<option value="">Nenhuma</option>' + rec.map(s=>`<option value="${s.nome}">${s.nome}</option>`).join('');
   const fs = document.getElementById('fil-subcat');
   if(fs) fs.innerHTML = '<option value="">Todas</option>' + all.map(s=>`<option value="${s.nome}">${s.nome}</option>`).join('');
+  const ps = document.getElementById('pagar-subcat');
+  if(ps) ps.innerHTML = '<option value="">Todas</option>' + desp.map(s=>`<option value="${s.nome}">${s.nome}</option>`).join('');
 }
 
 // ══ DASHBOARD ══
@@ -1357,26 +1385,70 @@ function renderDespTable(list) {
   initSwipe();
 }
 
-function renderMovTable() {
+let movCacheList=[];
+function renderMovTable(lista) {
   const t=document.getElementById('mov-table'),m=document.getElementById('mov-cards');
-  const rec=cache.receitas.map(r=>({...r,_tipo:'Receita'})).filter(r=>r.status==='Pago');
-  const desp=cache.despesas.map(d=>({...d,_tipo:'Despesa'})).filter(d=>d.status==='Pago');
-  const todos=[...rec,...desp].sort((a,b)=>((b.dataPagamento||b.venc)||'').localeCompare((a.dataPagamento||a.venc)||''));
-  if(!todos.length){if(t)t.innerHTML='<div style="padding:1rem;font-size:.82rem;color:var(--text-3);text-align:center">Nenhum lançamento pago.</div>';if(m)m.innerHTML='';return;}
-  if(t)t.innerHTML=`<div class="data-table"><div class="dt-head" style="grid-template-columns:2fr 1fr 1fr 1fr 1fr 1fr"><span>Descrição</span><span>Tipo</span><span>Categoria</span><span>Vencimento</span><span>Pagamento</span><span>Valor</span></div>`+
-    todos.map(x=>`<div class="dt-row" style="grid-template-columns:2fr 1fr 1fr 1fr 1fr 1fr">
-      <span>${x.desc||'—'}${x.subcat?` <span style="font-size:.65rem;color:var(--text-3)">· ${x.subcat}</span>`:''}</span>
+  if(!lista) {
+    const ini=document.getElementById('mov-ini')?.value||'';
+    const fim=document.getElementById('mov-fim')?.value||'';
+    const q=document.getElementById('mov-search')?.value?.toLowerCase()||'';
+    const rec=cache.receitas.map(r=>({...r,_tipo:'Receita'})).filter(r=>r.status==='Pago');
+    const desp=cache.despesas.map(d=>({...d,_tipo:'Despesa'})).filter(d=>d.status==='Pago');
+    let todos=[...rec,...desp];
+    if(ini) todos=todos.filter(x=>(x.dataPagamento||x.venc)>=ini);
+    if(fim) todos=todos.filter(x=>(x.dataPagamento||x.venc)<=fim);
+    if(q) todos=todos.filter(x=>x.desc?.toLowerCase().includes(q));
+    todos=todos.sort((a,b)=>((b.dataPagamento||b.venc)||'').localeCompare((a.dataPagamento||a.venc)||''));
+    movCacheList=todos;
+    lista=todos;
+  }
+  if(!lista.length){if(t)t.innerHTML='<div style="padding:1rem;font-size:.82rem;color:var(--text-3);text-align:center">Nenhum lançamento encontrado.</div>';if(m)m.innerHTML='';return;}
+  if(t)t.innerHTML=`<div class="data-table"><div class="dt-head" style="grid-template-columns:2fr 1fr 1fr 1fr 1fr 1fr auto"><span>Descrição</span><span>Tipo</span><span>Categoria</span><span>Vencimento</span><span>Pagamento</span><span>Valor</span><span></span></div>`+
+    lista.map(x=>`<div class="dt-row" style="grid-template-columns:2fr 1fr 1fr 1fr 1fr 1fr auto">
+      <span>
+        <span style="font-weight:600">${x.desc||'—'}${x.subcat?` <span style="font-size:.65rem;color:var(--text-3)">· ${x.subcat}</span>`:''}</span>
+        ${x.obs?`<div style="font-size:.68rem;color:var(--text-3);margin-top:1px">📝 ${x.obs}</div>`:''}
+      </span>
       <span><span class="badge ${x._tipo==='Receita'?'bg-green':'bg-red'}" style="font-size:.6rem">${x._tipo}</span></span>
       <span>${x.cat||'—'}</span>
       <span style="color:var(--text-3)">${fd(x.venc)}</span>
       <span style="font-weight:600;color:var(--text)">${x.dataPagamento?fd(x.dataPagamento):'—'}</span>
       <span style="font-weight:700;color:${x._tipo==='Receita'?'var(--green)':'var(--red)'}">${fm(x.val)}</span>
+      <span style="display:flex;gap:4px;align-items:center">
+        <button class="btn btn-ghost btn-sm" title="Editar" onclick="${x._tipo==='Receita'?`editRec('${x.id}')`:`editDesp('${x.id}')`}">✏️</button>
+        <button class="btn btn-ghost btn-sm" style="color:var(--yellow);border-color:var(--yellow)" title="Devolver para A Pagar/A Receber" onclick="devolverLancamento('${x.id}','${x._tipo}')">↩️</button>
+      </span>
     </div>`).join('')+'</div>';
-  if(m)m.innerHTML=todos.map(x=>`
+  if(m)m.innerHTML=lista.map(x=>`
     <div class="mob-card">
       <div class="mob-top"><div class="mob-name">${x.desc} <span class="badge ${x._tipo==='Receita'?'bg-green':'bg-red'}" style="font-size:.6rem">${x._tipo}</span></div><div class="mob-val" style="color:${x._tipo==='Receita'?'var(--green)':'var(--red)'}">${fm(x.val)}</div></div>
       <div class="mob-meta"><span>${x.cat}</span>${x.dataPagamento?`<span>✅ ${fd(x.dataPagamento)}</span>`:''}</div>
+      ${x.obs?`<div style="font-size:.7rem;color:var(--text-3);margin-top:.25rem">📝 ${x.obs}</div>`:''}
+      <div class="mob-actions">
+        <button class="btn btn-ghost btn-sm" onclick="${x._tipo==='Receita'?`editRec('${x.id}')`:`editDesp('${x.id}')`}">✏️ Editar</button>
+        <button class="btn btn-ghost btn-sm" style="color:var(--yellow);border-color:var(--yellow)" onclick="devolverLancamento('${x.id}','${x._tipo}')">↩️ Devolver</button>
+      </div>
     </div>`).join('');
+}
+function buscarMov(q){renderMovTable();}
+function filtrarMovData(){renderMovTable();}
+function limparFiltrosMov(){
+  const ini=document.getElementById('mov-ini');const fim=document.getElementById('mov-fim');const s=document.getElementById('mov-search');
+  if(ini)ini.value='';if(fim)fim.value='';if(s)s.value='';
+  renderMovTable();
+}
+async function devolverLancamento(id,tipo) {
+  if(!confirm('Devolver este lançamento para status Pendente?')) return;
+  const colecao=tipo==='Receita'?'receitas':'despesas';
+  const colBev=colecao+'_bev';
+  const updateData={status:'Pendente',dataPagamento:'',updatedAt:firebase.firestore.FieldValue.serverTimestamp()};
+  try {
+    await db.collection(colBev).doc(id).update(updateData);
+    const item=cache[colecao].find(x=>x.id===id);
+    if(item){item.status='Pendente';item.dataPagamento='';}
+    renderMovTable(); renderLancamentos(); renderDashboard();
+    showToast('Lançamento devolvido para pendente.');
+  } catch(e){showToast('Erro ao devolver.','err');}
 }
 
 function renderProjecao() {
@@ -1417,7 +1489,30 @@ function filtrarDesp(tipo,el) {
   renderDespTable(f);
 }
 function buscarRec(q){renderRecTable(q?cache.receitas.filter(r=>r.desc?.toLowerCase().includes(q.toLowerCase())):cache.receitas.filter(r=>isMesAtual(r.venc)));}
-function buscarDesp(q){renderDespTable(q?cache.despesas.filter(d=>d.desc?.toLowerCase().includes(q.toLowerCase())):cache.despesas.filter(d=>isMesAtual(d.venc)));}
+function buscarDesp(q){renderDespTable(q?cache.despesas.filter(d=>d.desc?.toLowerCase().includes(q.toLowerCase())):filtrarDespDataBase());}
+function filtrarDespDataBase() {
+  const ini=document.getElementById('pagar-ini')?.value||'';
+  const fim=document.getElementById('pagar-fim')?.value||'';
+  const cat=document.getElementById('pagar-cat')?.value||'';
+  const subcat=document.getElementById('pagar-subcat')?.value||'';
+  let f=cache.despesas;
+  if(!ini&&!fim&&!cat&&!subcat) f=f.filter(d=>isMesAtual(d.venc));
+  if(ini) f=f.filter(d=>d.venc&&d.venc>=ini);
+  if(fim) f=f.filter(d=>d.venc&&d.venc<=fim);
+  if(cat) f=f.filter(d=>d.cat===cat);
+  if(subcat) f=f.filter(d=>d.subcat===subcat);
+  return f;
+}
+function filtrarDespData(){
+  document.querySelectorAll('#tab-a-pagar .qf-btn').forEach(b=>b.classList.remove('active'));
+  renderDespTable(filtrarDespDataBase());
+}
+function limparFiltrosPagar(){
+  const ids=['pagar-ini','pagar-fim','pagar-cat','pagar-subcat'];
+  ids.forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  document.querySelector('#tab-a-pagar .qf-btn')?.classList.add('active');
+  renderDespTable(cache.despesas.filter(d=>isMesAtual(d.venc)));
+}
 
 // ══ TABS ══
 function switchTab(id,el) {
@@ -2106,7 +2201,10 @@ function renderTabelaMensal(lista) {
   if(!lista.length){el.innerHTML='<div style="padding:1rem;font-size:.82rem;color:var(--text-3);text-align:center">Nenhum lançamento.</div>';return;}
   el.innerHTML=`<div class="dt-head" style="grid-template-columns:2fr 1fr 1fr 1fr 1fr"><span>Descrição</span><span>Tipo</span><span>Categoria</span><span>Data</span><span>Valor</span></div>`+
     lista.map(x=>`<div class="dt-row" style="grid-template-columns:2fr 1fr 1fr 1fr 1fr">
-      <span style="font-weight:500">${x.desc||'—'}${x.subcat?` <span style="font-size:.65rem;color:var(--text-3)">· ${x.subcat}</span>`:''}</span>
+      <span>
+        <span style="font-weight:500">${x.desc||'—'}${x.subcat?` <span style="font-size:.65rem;color:var(--text-3)">· ${x.subcat}</span>`:''}</span>
+        ${x.obs?`<div style="font-size:.68rem;color:var(--text-3);margin-top:1px">📝 ${x.obs}</div>`:''}
+      </span>
       <span><span class="badge ${x._tipo==='receita'?'bg-green':'bg-red'}" style="font-size:.6rem">${x._tipo==='receita'?'Receita':'Despesa'}</span></span>
       <span style="color:var(--text-2)">${x.cat||'—'}</span>
       <span>${fd(x.venc)}</span>
@@ -2199,7 +2297,10 @@ function gerarFiltrado() {
   if(!todos.length){tabEl.innerHTML='<div style="padding:1.25rem;font-size:.82rem;color:var(--text-3);text-align:center">Nenhum resultado.</div>';return;}
   tabEl.innerHTML=`<div class="dt-head" style="grid-template-columns:2fr 1fr 1fr 1fr 1fr"><span>Descrição</span><span>Tipo</span><span>Subcategoria</span><span>Data</span><span>Valor</span></div>`+
     todos.map(x=>`<div class="dt-row" style="grid-template-columns:2fr 1fr 1fr 1fr 1fr">
-      <span style="font-weight:500">${x.desc||'—'}</span>
+      <span>
+        <span style="font-weight:500">${x.desc||'—'}</span>
+        ${x.obs?`<div style="font-size:.68rem;color:var(--text-3);margin-top:1px">📝 ${x.obs}</div>`:''}
+      </span>
       <span><span class="badge ${x._tipo==='receita'?'bg-green':'bg-red'}" style="font-size:.6rem">${x._tipo==='receita'?'Receita':'Despesa'}</span></span>
       <span style="color:var(--text-2)">${x.subcat||x.cat||'—'}</span>
       <span>${fd(x.venc)}</span>
