@@ -463,7 +463,7 @@ body.dark .card,.dark .kpi,.dark .fin-stat,.dark .ind,.dark .conta-card,.dark .m
             <div class="tab active" onclick="switchTab('a-rec',this)">A Receber</div>
             <div class="tab" onclick="switchTab('a-pagar',this)">A Pagar</div>
             <div class="tab" onclick="switchTab('mov',this)">📋 Movimentação</div>
-            <div class="tab" onclick="switchTab('projecao',this)">📊 Previsões — Próx. Mês</div>
+            <div class="tab" onclick="switchTab('projecao',this)">📊 Projeção</div>
           </div>
           <div class="tab-panel active" id="tab-a-rec">
             <div class="qf">
@@ -519,11 +519,11 @@ body.dark .card,.dark .kpi,.dark .fin-stat,.dark .ind,.dark .conta-card,.dark .m
             <div class="cards-mobile" id="mov-cards"></div>
           </div>
           <div class="tab-panel" id="tab-projecao">
-            <div style="font-size:.72rem;color:var(--text-3);margin-bottom:.875rem">📊 Todos os lançamentos com vencimento no próximo mês — receitas, despesas fixas, variáveis, extras e parcelas já cadastradas.</div>
+            <div style="font-size:.72rem;color:var(--text-3);margin-bottom:.875rem">📊 Estimativa para o próximo mês baseada em lançamentos fixos.</div>
             <div id="proj-cards" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:1rem;margin-bottom:1rem"></div>
-            <div style="font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-3);margin:.875rem 0 .5rem">Receitas previstas</div>
+            <div style="font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-3);margin:.875rem 0 .5rem">Receitas fixas previstas</div>
             <div class="card" id="proj-rec"></div>
-            <div style="font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-3);margin:.875rem 0 .5rem">Despesas previstas</div>
+            <div style="font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-3);margin:.875rem 0 .5rem">Despesas fixas previstas</div>
             <div class="card" id="proj-desp"></div>
           </div>
         </div>
@@ -578,7 +578,11 @@ body.dark .card,.dark .kpi,.dark .fin-stat,.dark .ind,.dark .conta-card,.dark .m
           <div class="ind-grid" id="ind-mensal"></div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem" id="mensal-charts-2col">
             <div class="chart-box" style="margin:0"><div class="chart-label" id="chart-mensal-title">Receitas x Despesas</div><canvas id="chart-mensal" height="150"></canvas></div>
-            <div class="chart-box" style="margin:0"><div class="chart-label">Despesas por Categoria</div><canvas id="chart-pizza" height="150"></canvas></div>
+            <div class="chart-box" style="margin:0"><div class="chart-label">Despesas por Subcategoria</div><canvas id="chart-pizza" height="150"></canvas></div>
+          </div>
+          <div class="chart-box" style="margin-bottom:1rem">
+            <div class="chart-label">Despesas por Tipo — Fixo · Variável · Extra</div>
+            <canvas id="chart-cat-tipo" height="90"></canvas>
           </div>
           <div class="card" style="padding:0;overflow:hidden">
             <div style="padding:.875rem 1.25rem;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
@@ -750,9 +754,11 @@ body.dark .card,.dark .kpi,.dark .fin-stat,.dark .ind,.dark .conta-card,.dark .m
           <option value="semanal">Semanal</option>
           <option value="mensal">Mensal</option>
           <option value="anual">Anual</option>
+          <option value="personalizado">Personalizado</option>
         </select>
       </div>
-      <div class="form-group" id="r-rep-fim-grp" style="display:none"><label class="form-label">Quantas repetições</label><input class="form-input" type="number" id="r-rep-fim" min="1" max="360" placeholder="Ex: 12"></div>
+      <div class="form-group" id="r-rep-fim-grp" style="display:none"><label class="form-label" id="r-rep-fim-label">Quantas repetições</label><input class="form-input" type="number" id="r-rep-fim" min="1" max="999" placeholder="Ex: 12"></div>
+      <div class="form-group" id="r-rep-custom-grp" style="display:none"><label class="form-label">Intervalo (em dias)</label><input class="form-input" type="number" id="r-rep-custom-dias" min="1" max="999" placeholder="Ex: 45"></div>
     </div>
     <div class="form-group"><label class="form-label">Observação</label><input class="form-input" id="r-obs" placeholder="Opcional"></div>
     <div class="modal-footer">
@@ -1235,40 +1241,73 @@ function renderDashboard() {
       <div style="font-size:.65rem;color:var(--text-3)">${c.tipo||''}</div>
     </div>`).join('') : '<div style="font-size:.8rem;color:var(--text-3)">Nenhuma conta cadastrada.</div>';
 
-  // Alertas
+  // Alertas — vencidos sempre aparecem; próximos a vencer seguem alertaDias
   const alertaDias = parseInt(document.getElementById('cfg-alerta-dias')?.value)||3;
-  const limitDate = new Date(new Date().getTime()+alertaDias*86400000).toISOString().split('T')[0];
-  const alertas = cache.despesas.filter(d=>d.status!=='Pago'&&d.venc&&d.venc<=limitDate);
-  // Alertas de investimento com validade próxima (2 dias fixo)
   const hoje=new Date(); hoje.setHours(0,0,0,0);
+  const hojeStr=hoje.toISOString().split('T')[0];
+  const limitDate=new Date(hoje.getTime()+alertaDias*86400000).toISOString().split('T')[0];
+  // Vencidos: pendentes com venc ANTES de hoje (qualquer data passada)
+  const vencidos=cache.despesas.filter(d=>d.status!=='Pago'&&d.venc&&d.venc<hojeStr);
+  // Próximos a vencer: pendentes entre hoje e hoje+alertaDias
+  const proxVencer=cache.despesas.filter(d=>d.status!=='Pago'&&d.venc&&d.venc>=hojeStr&&d.venc<=limitDate);
+  // Alertas de investimento com validade próxima
   const invAlerts=cache.investimentos.filter(inv=>{
     if(!inv.validade) return false;
     const dv=new Date(inv.validade+'T12:00:00');
-    const diff=Math.ceil((dv-hoje)/(1000*60*60*24));
-    return diff<=2;
+    return Math.ceil((dv-hoje)/(1000*60*60*24))<=2;
   });
-  const totalAlertas=alertas.length+invAlerts.length;
+  const totalAlertas=vencidos.length+proxVencer.length+invAlerts.length;
   sid('d-alertas-n', String(totalAlertas));
-  const da = document.getElementById('d-alertas');
+  const da=document.getElementById('d-alertas');
   if(da) {
     let html='';
-    if(alertas.length) html+=alertas.slice(0,4).map(d=>{
-      const dias = Math.floor((new Date(d.venc+'T12:00:00')-new Date())/86400000);
-      const label = dias<0?`Venceu há ${Math.abs(dias)} dia(s)`:dias===0?'Vence hoje':`Vence em ${dias} dia(s)`;
-      return `<div style="display:flex;justify-content:space-between;padding:.45rem 0;border-bottom:1px solid var(--border);font-size:.8rem">
-        <span style="color:${dias<=0?'var(--red)':'var(--yellow)'}">${dias<=0?'⚠️':'🔔'} ${d.desc}</span>
-        <div style="text-align:right"><div style="font-weight:700;color:var(--red)">${fm(d.val)}</div><div style="font-size:.68rem;color:var(--text-3)">${label}</div></div>
-      </div>`;
-    }).join('');
-    if(invAlerts.length) html+=invAlerts.map(inv=>{
-      const dv=new Date(inv.validade+'T12:00:00');
-      const diff=Math.ceil((dv-hoje)/(1000*60*60*24));
-      const label=diff<0?'Vencido':diff===0?'Vence hoje':`Vence em ${diff} dia(s)`;
-      return `<div style="display:flex;justify-content:space-between;padding:.45rem 0;border-bottom:1px solid var(--border);font-size:.8rem">
-        <span style="color:var(--yellow)">📈 ${inv.inst||'Investimento'} — ${inv.tipo||''}</span>
-        <div style="text-align:right"><div style="font-weight:700;color:var(--yellow)">${fm(inv.valor)}</div><div style="font-size:.68rem;color:var(--text-3)">${label}</div></div>
-      </div>`;
-    }).join('');
+    // ── Vencidos (vermelho) ──────────────────────────────────────────────
+    if(vencidos.length) {
+      html+=`<div style="font-size:.67rem;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--red);padding:.35rem 0 .15rem">⚠️ Vencidos — ${vencidos.length}</div>`;
+      html+=vencidos.map(d=>{
+        const diasAtras=Math.floor((hoje-new Date(d.venc+'T12:00:00'))/86400000);
+        const label=diasAtras===0?'Venceu hoje':`Venceu há ${diasAtras} dia(s)`;
+        return `<div style="display:flex;justify-content:space-between;align-items:center;padding:.4rem 0;border-bottom:1px solid #fecaca;font-size:.8rem">
+          <span style="color:var(--red);font-weight:600">⚠️ ${d.desc}</span>
+          <div style="text-align:right;flex-shrink:0;margin-left:.5rem">
+            <div style="font-weight:700;color:var(--red)">${fm(d.val)}</div>
+            <div style="font-size:.65rem;color:var(--text-3)">${label}</div>
+          </div>
+        </div>`;
+      }).join('');
+    }
+    // ── Próximos a vencer (amarelo) ──────────────────────────────────────
+    if(proxVencer.length) {
+      if(html) html+=`<div style="height:.5rem"></div>`;
+      html+=`<div style="font-size:.67rem;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--yellow);padding:.35rem 0 .15rem">🔔 Vencem em breve</div>`;
+      html+=proxVencer.map(d=>{
+        const diasAte=Math.floor((new Date(d.venc+'T12:00:00')-hoje)/86400000);
+        const label=diasAte===0?'Vence hoje':`Vence em ${diasAte} dia(s)`;
+        return `<div style="display:flex;justify-content:space-between;align-items:center;padding:.4rem 0;border-bottom:1px solid var(--border);font-size:.8rem">
+          <span style="color:var(--yellow)">🔔 ${d.desc}</span>
+          <div style="text-align:right;flex-shrink:0;margin-left:.5rem">
+            <div style="font-weight:700;color:var(--yellow)">${fm(d.val)}</div>
+            <div style="font-size:.65rem;color:var(--text-3)">${label}</div>
+          </div>
+        </div>`;
+      }).join('');
+    }
+    // ── Investimentos com validade próxima ───────────────────────────────
+    if(invAlerts.length) {
+      if(html) html+=`<div style="height:.5rem"></div>`;
+      html+=invAlerts.map(inv=>{
+        const dv=new Date(inv.validade+'T12:00:00');
+        const diff=Math.ceil((dv-hoje)/(1000*60*60*24));
+        const label=diff<0?'Vencido':diff===0?'Vence hoje':`Vence em ${diff} dia(s)`;
+        return `<div style="display:flex;justify-content:space-between;align-items:center;padding:.4rem 0;border-bottom:1px solid var(--border);font-size:.8rem">
+          <span style="color:var(--yellow)">📈 ${inv.inst||'Investimento'} — ${inv.tipo||''}</span>
+          <div style="text-align:right;flex-shrink:0;margin-left:.5rem">
+            <div style="font-weight:700;color:var(--yellow)">${fm(inv.valor)}</div>
+            <div style="font-size:.65rem;color:var(--text-3)">${label}</div>
+          </div>
+        </div>`;
+      }).join('');
+    }
     da.innerHTML=html||'<div style="font-size:.8rem;color:var(--text-3);text-align:center;padding:1rem">Nenhum alerta</div>';
   }
 
@@ -1452,82 +1491,22 @@ async function devolverLancamento(id,tipo) {
 }
 
 function renderProjecao() {
-  // Calcula mês e ano do próximo mês
-  const agora = new Date();
-  const proxMesIdx = (agora.getMonth() + 1) % 12;
-  const proxAno = agora.getMonth() === 11 ? agora.getFullYear() + 1 : agora.getFullYear();
-  const mesesN = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
-  const proxMesNome = mesesN[proxMesIdx];
-
-  // Critério único, sem duplicidade:
-  // Pega todos os lançamentos cujo campo `venc` cai no próximo mês/ano.
-  // Parcelas e recorrências já foram criadas como lançamentos individuais com venc próprio,
-  // então basta filtrar por data — nenhuma inferência ou extrapolação necessária.
-  function isProxMes(venc) {
-    if (!venc) return false;
-    const d = new Date(venc + 'T12:00:00');
-    return d.getMonth() === proxMesIdx && d.getFullYear() === proxAno;
-  }
-
-  const recPrev = cache.receitas.filter(r => isProxMes(r.venc));
-  const despPrev = cache.despesas.filter(d => isProxMes(d.venc));
-
-  const tRec  = recPrev.reduce((s, r) => s + pm(r.val), 0);
-  const tDesp = despPrev.reduce((s, d) => s + pm(d.val), 0);
-  const saldo = tRec - tDesp;
-
-  // Cards de resumo
-  const pc = document.getElementById('proj-cards');
-  if (pc) pc.innerHTML = `
-    <div class="fin-stat">
-      <div class="fin-stat-label">Receita Prevista — ${proxMesNome}</div>
-      <div class="fin-stat-val" style="color:var(--green)">${fm(tRec)}</div>
-      <div style="font-size:.68rem;color:var(--text-3);margin-top:3px">${recPrev.length} lançamento(s)</div>
-    </div>
-    <div class="fin-stat">
-      <div class="fin-stat-label">Despesas Previstas — ${proxMesNome}</div>
-      <div class="fin-stat-val" style="color:var(--red)">${fm(tDesp)}</div>
-      <div style="font-size:.68rem;color:var(--text-3);margin-top:3px">${despPrev.length} lançamento(s)</div>
-    </div>
-    <div class="fin-stat">
-      <div class="fin-stat-label">Saldo Projetado</div>
-      <div class="fin-stat-val" style="color:${saldo>=0?'var(--green)':'var(--red)'}">${fm(saldo)}</div>
-      <div style="font-size:.68rem;color:var(--text-3);margin-top:3px">${saldo>=0?'superávit':'déficit'}</div>
-    </div>`;
-
-  // Tag de tipo de lançamento
-  function tipoBadge(x) {
-    if (x.rep === 'parcelado' || x.parcela)
-      return `<span style="font-size:.6rem;color:var(--blue);background:var(--blue-bg);border-radius:3px;padding:1px 6px;margin-left:5px;flex-shrink:0">Parcela</span>`;
-    if (x.rep && x.rep !== '')
-      return `<span style="font-size:.6rem;color:var(--gold);background:var(--gold-pale);border-radius:3px;padding:1px 6px;margin-left:5px;flex-shrink:0">Recorrente</span>`;
-    const catBg = x.cat==='Fixo'||x.cat==='Fixa' ? '#f3ede7' : x.cat==='Variável' ? 'var(--yellow-bg)' : 'var(--red-bg)';
-    const catCl = x.cat==='Fixo'||x.cat==='Fixa' ? 'var(--text-2)' : x.cat==='Variável' ? 'var(--yellow)' : 'var(--red)';
-    return `<span style="font-size:.6rem;color:${catCl};background:${catBg};border-radius:3px;padding:1px 6px;margin-left:5px;flex-shrink:0">${x.cat||'Avulso'}</span>`;
-  }
-
-  function renderLista(lista, cor) {
-    if (!lista.length) return `<div style="font-size:.82rem;color:var(--text-3);padding:.5rem 0">Nenhum lançamento previsto.</div>`;
-    const sorted = [...lista].sort((a,b) => (a.venc||'').localeCompare(b.venc||''));
-    return sorted.map(x => `
-      <div style="display:flex;justify-content:space-between;align-items:center;padding:.45rem 0;border-bottom:1px solid var(--border)">
-        <div style="display:flex;align-items:center;flex-wrap:wrap;gap:2px;min-width:0">
-          <span style="font-size:.82rem;color:var(--text-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${x.desc||'—'}</span>
-          ${tipoBadge(x)}
-          ${x.subcat?`<span style="font-size:.62rem;color:var(--text-3)">${x.subcat}</span>`:''}
-        </div>
-        <div style="text-align:right;flex-shrink:0;margin-left:.75rem">
-          <div style="font-weight:700;color:${cor}">${fm(x.val)}</div>
-          <div style="font-size:.65rem;color:var(--text-3)">${x.venc ? new Date(x.venc+'T12:00:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'}) : '—'}</div>
-        </div>
-      </div>`).join('');
-  }
-
-  const pr = document.getElementById('proj-rec');
-  if (pr) pr.innerHTML = renderLista(recPrev, 'var(--green)');
-
-  const pd = document.getElementById('proj-desp');
-  if (pd) pd.innerHTML = renderLista(despPrev, 'var(--red)');
+  const meses=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  const proxMes=meses[(mesAtual()+1)%12];
+  const recFixas=cache.receitas.filter(r=>r.cat==='Fixa');
+  const despFixas=cache.despesas.filter(d=>d.cat==='Fixo');
+  const tRec=recFixas.reduce((s,r)=>s+pm(r.val),0);
+  const tDesp=despFixas.reduce((s,d)=>s+pm(d.val),0);
+  const saldo=tRec-tDesp;
+  const pc=document.getElementById('proj-cards');
+  if(pc)pc.innerHTML=`
+    <div class="fin-stat"><div class="fin-stat-label">Receita Prevista — ${proxMes}</div><div class="fin-stat-val" style="color:var(--green)">${fm(tRec)}</div></div>
+    <div class="fin-stat"><div class="fin-stat-label">Despesas Fixas — ${proxMes}</div><div class="fin-stat-val" style="color:var(--red)">${fm(tDesp)}</div></div>
+    <div class="fin-stat"><div class="fin-stat-label">Saldo Projetado</div><div class="fin-stat-val" style="color:${saldo>=0?'var(--green)':'var(--red)'}">${fm(saldo)}</div></div>`;
+  const pr=document.getElementById('proj-rec');
+  if(pr)pr.innerHTML=recFixas.length?recFixas.map(r=>`<div style="display:flex;justify-content:space-between;padding:.4rem 0;border-bottom:1px solid var(--border);font-size:.82rem"><span style="color:var(--text-2)">${r.desc}</span><span style="font-weight:700;color:var(--green)">${fm(r.val)}</span></div>`).join(''):'<div style="font-size:.82rem;color:var(--text-3)">Nenhuma receita fixa.</div>';
+  const pd=document.getElementById('proj-desp');
+  if(pd)pd.innerHTML=despFixas.length?despFixas.map(d=>`<div style="display:flex;justify-content:space-between;padding:.4rem 0;border-bottom:1px solid var(--border);font-size:.82rem"><span style="color:var(--text-2)">${d.desc}</span><span style="font-weight:700;color:var(--red)">${fm(d.val)}</span></div>`).join(''):'<div style="font-size:.82rem;color:var(--text-3)">Nenhuma despesa fixa.</div>';
 }
 
 // ══ FILTROS ══
@@ -1636,7 +1615,14 @@ function initSwipe() {
 // ══ RECEITAS CRUD ══
 function toggleRepRec() {
   const rep=document.getElementById('r-rep').value;
-  document.getElementById('r-rep-fim-grp').style.display=rep?'block':'none';
+  const hasRep=rep!=='';
+  document.getElementById('r-rep-fim-grp').style.display=hasRep?'block':'none';
+  // Campo de intervalo só aparece no modo personalizado
+  const customGrp=document.getElementById('r-rep-custom-grp');
+  if(customGrp) customGrp.style.display=rep==='personalizado'?'block':'none';
+  // Atualiza label
+  const lbl=document.getElementById('r-rep-fim-label');
+  if(lbl) lbl.textContent=rep==='personalizado'?'Quantidade de repetições':'Quantas repetições';
 }
 function gerarDatasRepQtd(vencBase, rep, qtd) {
   const datas=[];
@@ -1667,7 +1653,17 @@ async function saveRec() {
     // Gerar lançamentos futuros de repetição (apenas em novo)
     if(!editId && rep && venc) {
       const qtd=parseInt(repQtd)||1;
-      const datas=gerarDatasRepQtd(venc,rep,qtd);
+      let datas=[];
+      if(rep==='personalizado') {
+        const diasInt=parseInt(document.getElementById('r-rep-custom-dias')?.value)||30;
+        let cur=new Date(venc+'T12:00:00');
+        for(let i=0;i<qtd;i++) {
+          cur=new Date(cur.getTime()+diasInt*86400000);
+          datas.push(cur.toISOString().split('T')[0]);
+        }
+      } else {
+        datas=gerarDatasRepQtd(venc,rep,qtd);
+      }
       for(const d of datas) {
         const clone={...data,venc:d,status:'Pendente',rep:rep,mes:new Date(d+'T12:00:00').getMonth(),ano:new Date(d+'T12:00:00').getFullYear()};
         await saveDoc('receitas',null,clone);
@@ -2221,6 +2217,43 @@ function renderRelatorios() {
     const pLabels=Object.keys(catMap);
     destroyChart('chart-pizza');
     chartInst['chart-pizza']=new Chart(document.getElementById('chart-pizza'),{type:'doughnut',data:{labels:pLabels.length?pLabels:['Sem dados'],datasets:[{data:pLabels.length?pLabels.map(k=>catMap[k]):[1],backgroundColor:['rgba(160,120,80,.8)','rgba(220,38,38,.6)','rgba(234,179,8,.7)','rgba(59,130,246,.7)','rgba(109,90,172,.7)','rgba(5,150,105,.7)'].slice(0,Math.max(pLabels.length,1)),borderWidth:2,borderColor:'#fff'}]},options:{responsive:true,plugins:{legend:{position:'right'}}}});
+
+    // Gráfico Fixo / Variável / Extra
+    const tipoMap={Fixo:0,Variável:0,Extra:0};
+    cache.despesas.filter(d=>{
+      const dt=new Date((d.venc||'')+'T12:00:00');
+      return dt.getMonth()===mesSel&&dt.getFullYear()===ano;
+    }).forEach(d=>{
+      const t=d.cat;
+      if(t==='Fixo')tipoMap['Fixo']+=pm(d.val);
+      else if(t==='Variável')tipoMap['Variável']+=pm(d.val);
+      else tipoMap['Extra']+=pm(d.val);
+    });
+    const tipoLabels=['Fixo','Variável','Extra'].filter(k=>tipoMap[k]>0);
+    const tipoVals=tipoLabels.map(k=>tipoMap[k]);
+    const tipoCores={'Fixo':'rgba(107,114,128,.75)','Variável':'rgba(234,179,8,.8)','Extra':'rgba(220,38,38,.7)'};
+    destroyChart('chart-cat-tipo');
+    chartInst['chart-cat-tipo']=new Chart(document.getElementById('chart-cat-tipo'),{
+      type:'bar',
+      data:{
+        labels:tipoLabels.length?tipoLabels:['Sem dados'],
+        datasets:[{
+          label:'Despesas',
+          data:tipoLabels.length?tipoVals:[0],
+          backgroundColor:tipoLabels.map(k=>tipoCores[k]||'rgba(160,120,80,.7)'),
+          borderRadius:6
+        }]
+      },
+      options:{
+        indexAxis:'y',
+        responsive:true,
+        plugins:{
+          legend:{display:false},
+          tooltip:{callbacks:{label:ctx=>' '+ctx.parsed.x.toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}}
+        },
+        scales:{x:{beginAtZero:true,ticks:{callback:v=>v.toLocaleString('pt-BR',{style:'currency',currency:'BRL',minimumFractionDigits:0})}}}
+      }
+    });
 
     let semR=0,semD=0;
     const s6=[];for(let i=5;i>=0;i--){const m=(mesAtual()-i+12)%12;s6.push({l:meses[m],mn:mesesN[m],r:recByMes[m],d:despByMes[m]});semR+=recByMes[m];semD+=despByMes[m];}
