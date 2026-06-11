@@ -164,13 +164,6 @@ body.dark .card,.dark .kpi,.dark .fin-stat,.dark .ind,.dark .conta-card,.dark .m
 .kpi-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:1rem;margin-bottom:1.25rem;}
 .kpi{background:var(--white);border:1px solid var(--border);border-radius:var(--r);padding:1.125rem 1.25rem;box-shadow:var(--sh);position:relative;overflow:hidden;}
 .kpi::after{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--gold);}
-.kpi.vencido{border-color:#fca5a5;background:var(--red-bg);}
-.kpi.vencido::after{background:var(--red);}
-.overdue-badge{display:inline-flex;align-items:center;gap:3px;font-size:.62rem;font-weight:700;color:var(--red);background:var(--red-bg);border:1px solid #fca5a5;border-radius:20px;padding:2px 7px;margin-top:4px;}
-.dash-vencidos{background:var(--red-bg);border:1px solid #fca5a5;border-radius:var(--r);padding:.875rem 1.25rem;margin-top:1rem;}
-.dash-vencidos-title{font-size:.78rem;font-weight:700;color:var(--red);margin-bottom:.625rem;display:flex;align-items:center;gap:.375rem;}
-.dash-vencidos-item{display:flex;justify-content:space-between;align-items:center;padding:.35rem 0;border-bottom:1px solid #fecaca;font-size:.8rem;}
-.dash-vencidos-item:last-child{border-bottom:none;}
 .kpi-label{font-size:.68rem;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--text-3);margin-bottom:5px;}
 .kpi-val{font-family:'DM Serif Display',serif;font-size:1.5rem;line-height:1;margin-bottom:3px;}
 .kpi-sub{font-size:.7rem;color:var(--text-3);}
@@ -198,9 +191,6 @@ body.dark .card,.dark .kpi,.dark .fin-stat,.dark .ind,.dark .conta-card,.dark .m
 .qf-btn.active{background:var(--gold);color:#fff;border-color:var(--gold);}
 .del-btn{background:none;border:none;cursor:pointer;color:#fca5a5;font-size:.88rem;padding:0 4px;transition:color .15s;opacity:.5;}
 .del-btn:hover{color:var(--red);opacity:1;}
-.dt-row.vencido-row{background:#fff5f5;}
-.dt-row.vencido-row:hover{background:#fee2e2;}
-.mob-card.vencido-card{border-color:#fca5a5;background:#fff5f5;}
 
 /* MOBILE CARDS */
 .table-desktop{display:block;}
@@ -452,11 +442,6 @@ body.dark .card,.dark .kpi,.dark .fin-stat,.dark .ind,.dark .conta-card,.dark .m
           <div class="card-title">Orçamento do Mês <button class="btn btn-ghost btn-sm" onclick="goPage('orcamento',null)">Gerenciar</button></div>
           <div id="d-orc"></div>
         </div>
-        <div class="dash-vencidos" id="d-vencidos-wrap" style="display:none">
-          <div class="dash-vencidos-title">⚠️ Lançamentos Vencidos <span class="badge bg-red" id="d-vencidos-n">0</span></div>
-          <div id="d-vencidos-list"></div>
-          <div style="margin-top:.625rem"><button class="btn btn-ghost btn-sm" onclick="goPage('lancamentos',null);setTimeout(()=>{document.querySelector('#tab-a-pagar .qf-btn:nth-child(3)')?.click()},100)">Ver todos vencidos →</button></div>
-        </div>
       </div>
 
       <!-- LANÇAMENTOS -->
@@ -478,7 +463,7 @@ body.dark .card,.dark .kpi,.dark .fin-stat,.dark .ind,.dark .conta-card,.dark .m
             <div class="tab active" onclick="switchTab('a-rec',this)">A Receber</div>
             <div class="tab" onclick="switchTab('a-pagar',this)">A Pagar</div>
             <div class="tab" onclick="switchTab('mov',this)">📋 Movimentação</div>
-            <div class="tab" onclick="switchTab('projecao',this)">📊 Projeção</div>
+            <div class="tab" onclick="switchTab('projecao',this)">📊 Previsões — Próx. Mês</div>
           </div>
           <div class="tab-panel active" id="tab-a-rec">
             <div class="qf">
@@ -534,11 +519,11 @@ body.dark .card,.dark .kpi,.dark .fin-stat,.dark .ind,.dark .conta-card,.dark .m
             <div class="cards-mobile" id="mov-cards"></div>
           </div>
           <div class="tab-panel" id="tab-projecao">
-            <div style="font-size:.72rem;color:var(--text-3);margin-bottom:.875rem">📊 Estimativa para o próximo mês baseada em lançamentos fixos.</div>
+            <div style="font-size:.72rem;color:var(--text-3);margin-bottom:.875rem">📊 Todos os lançamentos com vencimento no próximo mês — receitas, despesas fixas, variáveis, extras e parcelas já cadastradas.</div>
             <div id="proj-cards" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:1rem;margin-bottom:1rem"></div>
-            <div style="font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-3);margin:.875rem 0 .5rem">Receitas fixas previstas</div>
+            <div style="font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-3);margin:.875rem 0 .5rem">Receitas previstas</div>
             <div class="card" id="proj-rec"></div>
-            <div style="font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-3);margin:.875rem 0 .5rem">Despesas fixas previstas</div>
+            <div style="font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-3);margin:.875rem 0 .5rem">Despesas previstas</div>
             <div class="card" id="proj-desp"></div>
           </div>
         </div>
@@ -593,9 +578,8 @@ body.dark .card,.dark .kpi,.dark .fin-stat,.dark .ind,.dark .conta-card,.dark .m
           <div class="ind-grid" id="ind-mensal"></div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem" id="mensal-charts-2col">
             <div class="chart-box" style="margin:0"><div class="chart-label" id="chart-mensal-title">Receitas x Despesas</div><canvas id="chart-mensal" height="150"></canvas></div>
-            <div class="chart-box" style="margin:0"><div class="chart-label">Despesas por Subcategoria</div><canvas id="chart-pizza" height="150"></canvas></div>
+            <div class="chart-box" style="margin:0"><div class="chart-label">Despesas por Categoria</div><canvas id="chart-pizza" height="150"></canvas></div>
           </div>
-          <div class="chart-box" style="margin-bottom:1rem"><div class="chart-label">Despesas por Tipo — Fixo · Variável · Extra</div><canvas id="chart-cat-tipo" height="100"></canvas></div>
           <div class="card" style="padding:0;overflow:hidden">
             <div style="padding:.875rem 1.25rem;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
               <span style="font-size:.82rem;font-weight:700">Lançamentos do mês</span>
@@ -1323,37 +1307,6 @@ function renderDashboard() {
   const sr=document.getElementById('sticky-rec'); if(sr) sr.textContent=fm(totalRec);
   const sd=document.getElementById('sticky-desp'); if(sd) sd.textContent=fm(totalDesp);
   const ss=document.getElementById('sticky-saldo'); if(ss) { ss.textContent=fm(saldo); ss.style.color=saldo>=0?'var(--green)':'var(--red)'; }
-
-  // Vencidos no dashboard
-  const h=today();
-  const vencidos=cache.despesas.filter(d=>d.status!=='Pago'&&d.venc&&d.venc<h);
-  const dvWrap=document.getElementById('d-vencidos-wrap');
-  const dvList=document.getElementById('d-vencidos-list');
-  const dvN=document.getElementById('d-vencidos-n');
-  if(dvWrap) dvWrap.style.display=vencidos.length?'block':'none';
-  if(dvN) dvN.textContent=String(vencidos.length);
-  if(dvList) dvList.innerHTML=vencidos.slice(0,5).map(d=>{
-    const dias=Math.floor((new Date(h)-new Date(d.venc+'T12:00:00'))/86400000);
-    return `<div class="dash-vencidos-item">
-      <span style="font-weight:600;color:var(--red)">⚠️ ${d.desc||'—'}</span>
-      <div style="text-align:right;flex-shrink:0;margin-left:.5rem">
-        <div style="font-weight:700;color:var(--red)">${fm(d.val)}</div>
-        <div style="font-size:.68rem;color:var(--text-3)">Venceu há ${dias} dia(s)</div>
-      </div>
-    </div>`;
-  }).join('')+(vencidos.length>5?`<div style="font-size:.72rem;color:var(--red);padding:.375rem 0">+${vencidos.length-5} lançamento(s) vencido(s)</div>`:'');
-
-  // KPI "A Pagar" — destaque vermelho se há vencidos
-  const kpiPagar=document.querySelector('#page-dashboard .kpi-grid .kpi:nth-child(4)');
-  if(kpiPagar) { kpiPagar.classList.toggle('vencido',vencidos.length>0); }
-  const kpiSubPagar=document.getElementById('d-pagar');
-  if(kpiSubPagar&&vencidos.length>0) {
-    const badge=kpiSubPagar.parentNode.querySelector('.overdue-badge');
-    if(!badge) { const b=document.createElement('div'); b.className='overdue-badge'; b.innerHTML=`⚠️ ${vencidos.length} vencido(s)`; kpiSubPagar.parentNode.appendChild(b); }
-    else { b.innerHTML=`⚠️ ${vencidos.length} vencido(s)`; }
-  } else {
-    document.querySelector('#page-dashboard .kpi-grid .kpi:nth-child(4) .overdue-badge')?.remove();
-  }
 }
 
 // ══ LANÇAMENTOS ══
@@ -1374,7 +1327,7 @@ function renderLancamentos() {
   const ss=document.getElementById('sticky-saldo');if(ss){ss.textContent=fm(saldo);ss.style.color=saldo>=0?'var(--green)':'var(--red)';}
   recCache=recMes; despCache=despMes;
   renderRecTable(recMes);
-  renderDespTable(filtrarDespDataBase());
+  renderDespTable(despMes);
   renderProjecao();
 }
 
@@ -1414,16 +1367,16 @@ function renderDespTable(list) {
     if(m)m.innerHTML='';return;
   }
   if(t)t.innerHTML=`<div class="data-table"><div class="dt-head" style="grid-template-columns:2fr 1fr 1fr 1fr 1fr 40px"><span>Descrição</span><span>Categoria</span><span>Vencimento</span><span>Valor</span><span>Status</span><span></span></div>`+
-    sorted.map(d=>{const isVenc=d.status!=='Pago'&&d.venc&&d.venc<today();return`<div class="dt-row${isVenc?' vencido-row':''}" style="grid-template-columns:2fr 1fr 1fr 1fr 1fr 40px">
+    sorted.map(d=>`<div class="dt-row" style="grid-template-columns:2fr 1fr 1fr 1fr 1fr 40px">
       <span style="font-weight:600;cursor:pointer;color:var(--gold)" onclick="editDesp('${d.id}')">${d.desc||'—'}${d.subcat?` <span style="font-size:.65rem;color:var(--text-3)">· ${d.subcat}</span>`:''}</span>
       <span><span class="badge ${d.cat==='Fixo'?'bg-neutral':d.cat==='Variável'?'bg-yellow':'bg-red'}">${d.cat}</span></span>
       <span style="color:var(--text-2)">${fd(d.venc)}</span>
       <span style="font-weight:700;color:var(--red)">${fm(d.val)}</span>
       <span><span class="badge ${d.status==='Pago'?'bg-green':'bg-yellow'} status-pill" onclick="toggleDesp('${d.id}')">${d.status==='Pago'?'Pago':'Pendente'}</span></span>
       <span><button class="del-btn" onclick="quickDelDesp('${d.id}')">🗑️</button></span>
-    </div>`;}).join('')+'</div>';
+    </div>`).join('')+'</div>';
   if(m)m.innerHTML=sorted.map(d=>`
-    <div class="mob-card${d.status!=='Pago'&&d.venc&&d.venc<today()?' vencido-card':''}" data-id="${d.id}" data-tipo="desp" data-status="${d.status}">
+    <div class="mob-card" data-id="${d.id}" data-tipo="desp" data-status="${d.status}">
       <div class="swipe-hint ${d.status==='Pago'?'warn':'ok'}">${d.status==='Pago'?'Pendente':'Pago ✓'}</div>
       <div class="mob-top"><div class="mob-name">${d.desc}${d.subcat?` <span style="font-size:.65rem;color:var(--text-3)">· ${d.subcat}</span>`:''}</div><div class="mob-val" style="color:var(--red)">${fm(d.val)}</div></div>
       <div class="mob-meta"><span class="badge ${d.status==='Pago'?'bg-green':'bg-yellow'} status-pill" onclick="toggleDesp('${d.id}')">${d.status==='Pago'?'Pago':'Pendente'}</span><span class="badge ${d.cat==='Fixo'?'bg-neutral':d.cat==='Variável'?'bg-yellow':'bg-red'}">${d.cat}</span>${d.venc?`<span>📅 ${fd(d.venc)}</span>`:''}</div>
@@ -1499,22 +1452,82 @@ async function devolverLancamento(id,tipo) {
 }
 
 function renderProjecao() {
-  const meses=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
-  const proxMes=meses[(mesAtual()+1)%12];
-  const recFixas=cache.receitas.filter(r=>r.cat==='Fixa');
-  const despFixas=cache.despesas.filter(d=>d.cat==='Fixo');
-  const tRec=recFixas.reduce((s,r)=>s+pm(r.val),0);
-  const tDesp=despFixas.reduce((s,d)=>s+pm(d.val),0);
-  const saldo=tRec-tDesp;
-  const pc=document.getElementById('proj-cards');
-  if(pc)pc.innerHTML=`
-    <div class="fin-stat"><div class="fin-stat-label">Receita Prevista — ${proxMes}</div><div class="fin-stat-val" style="color:var(--green)">${fm(tRec)}</div></div>
-    <div class="fin-stat"><div class="fin-stat-label">Despesas Fixas — ${proxMes}</div><div class="fin-stat-val" style="color:var(--red)">${fm(tDesp)}</div></div>
-    <div class="fin-stat"><div class="fin-stat-label">Saldo Projetado</div><div class="fin-stat-val" style="color:${saldo>=0?'var(--green)':'var(--red)'}">${fm(saldo)}</div></div>`;
-  const pr=document.getElementById('proj-rec');
-  if(pr)pr.innerHTML=recFixas.length?recFixas.map(r=>`<div style="display:flex;justify-content:space-between;padding:.4rem 0;border-bottom:1px solid var(--border);font-size:.82rem"><span style="color:var(--text-2)">${r.desc}</span><span style="font-weight:700;color:var(--green)">${fm(r.val)}</span></div>`).join(''):'<div style="font-size:.82rem;color:var(--text-3)">Nenhuma receita fixa.</div>';
-  const pd=document.getElementById('proj-desp');
-  if(pd)pd.innerHTML=despFixas.length?despFixas.map(d=>`<div style="display:flex;justify-content:space-between;padding:.4rem 0;border-bottom:1px solid var(--border);font-size:.82rem"><span style="color:var(--text-2)">${d.desc}</span><span style="font-weight:700;color:var(--red)">${fm(d.val)}</span></div>`).join(''):'<div style="font-size:.82rem;color:var(--text-3)">Nenhuma despesa fixa.</div>';
+  // Calcula mês e ano do próximo mês
+  const agora = new Date();
+  const proxMesIdx = (agora.getMonth() + 1) % 12;
+  const proxAno = agora.getMonth() === 11 ? agora.getFullYear() + 1 : agora.getFullYear();
+  const mesesN = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  const proxMesNome = mesesN[proxMesIdx];
+
+  // Critério único, sem duplicidade:
+  // Pega todos os lançamentos cujo campo `venc` cai no próximo mês/ano.
+  // Parcelas e recorrências já foram criadas como lançamentos individuais com venc próprio,
+  // então basta filtrar por data — nenhuma inferência ou extrapolação necessária.
+  function isProxMes(venc) {
+    if (!venc) return false;
+    const d = new Date(venc + 'T12:00:00');
+    return d.getMonth() === proxMesIdx && d.getFullYear() === proxAno;
+  }
+
+  const recPrev = cache.receitas.filter(r => isProxMes(r.venc));
+  const despPrev = cache.despesas.filter(d => isProxMes(d.venc));
+
+  const tRec  = recPrev.reduce((s, r) => s + pm(r.val), 0);
+  const tDesp = despPrev.reduce((s, d) => s + pm(d.val), 0);
+  const saldo = tRec - tDesp;
+
+  // Cards de resumo
+  const pc = document.getElementById('proj-cards');
+  if (pc) pc.innerHTML = `
+    <div class="fin-stat">
+      <div class="fin-stat-label">Receita Prevista — ${proxMesNome}</div>
+      <div class="fin-stat-val" style="color:var(--green)">${fm(tRec)}</div>
+      <div style="font-size:.68rem;color:var(--text-3);margin-top:3px">${recPrev.length} lançamento(s)</div>
+    </div>
+    <div class="fin-stat">
+      <div class="fin-stat-label">Despesas Previstas — ${proxMesNome}</div>
+      <div class="fin-stat-val" style="color:var(--red)">${fm(tDesp)}</div>
+      <div style="font-size:.68rem;color:var(--text-3);margin-top:3px">${despPrev.length} lançamento(s)</div>
+    </div>
+    <div class="fin-stat">
+      <div class="fin-stat-label">Saldo Projetado</div>
+      <div class="fin-stat-val" style="color:${saldo>=0?'var(--green)':'var(--red)'}">${fm(saldo)}</div>
+      <div style="font-size:.68rem;color:var(--text-3);margin-top:3px">${saldo>=0?'superávit':'déficit'}</div>
+    </div>`;
+
+  // Tag de tipo de lançamento
+  function tipoBadge(x) {
+    if (x.rep === 'parcelado' || x.parcela)
+      return `<span style="font-size:.6rem;color:var(--blue);background:var(--blue-bg);border-radius:3px;padding:1px 6px;margin-left:5px;flex-shrink:0">Parcela</span>`;
+    if (x.rep && x.rep !== '')
+      return `<span style="font-size:.6rem;color:var(--gold);background:var(--gold-pale);border-radius:3px;padding:1px 6px;margin-left:5px;flex-shrink:0">Recorrente</span>`;
+    const catBg = x.cat==='Fixo'||x.cat==='Fixa' ? '#f3ede7' : x.cat==='Variável' ? 'var(--yellow-bg)' : 'var(--red-bg)';
+    const catCl = x.cat==='Fixo'||x.cat==='Fixa' ? 'var(--text-2)' : x.cat==='Variável' ? 'var(--yellow)' : 'var(--red)';
+    return `<span style="font-size:.6rem;color:${catCl};background:${catBg};border-radius:3px;padding:1px 6px;margin-left:5px;flex-shrink:0">${x.cat||'Avulso'}</span>`;
+  }
+
+  function renderLista(lista, cor) {
+    if (!lista.length) return `<div style="font-size:.82rem;color:var(--text-3);padding:.5rem 0">Nenhum lançamento previsto.</div>`;
+    const sorted = [...lista].sort((a,b) => (a.venc||'').localeCompare(b.venc||''));
+    return sorted.map(x => `
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:.45rem 0;border-bottom:1px solid var(--border)">
+        <div style="display:flex;align-items:center;flex-wrap:wrap;gap:2px;min-width:0">
+          <span style="font-size:.82rem;color:var(--text-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${x.desc||'—'}</span>
+          ${tipoBadge(x)}
+          ${x.subcat?`<span style="font-size:.62rem;color:var(--text-3)">${x.subcat}</span>`:''}
+        </div>
+        <div style="text-align:right;flex-shrink:0;margin-left:.75rem">
+          <div style="font-weight:700;color:${cor}">${fm(x.val)}</div>
+          <div style="font-size:.65rem;color:var(--text-3)">${x.venc ? new Date(x.venc+'T12:00:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'}) : '—'}</div>
+        </div>
+      </div>`).join('');
+  }
+
+  const pr = document.getElementById('proj-rec');
+  if (pr) pr.innerHTML = renderLista(recPrev, 'var(--green)');
+
+  const pd = document.getElementById('proj-desp');
+  if (pd) pd.innerHTML = renderLista(despPrev, 'var(--red)');
 }
 
 // ══ FILTROS ══
@@ -1543,18 +1556,7 @@ function filtrarDespDataBase() {
   const cat=document.getElementById('pagar-cat')?.value||'';
   const subcat=document.getElementById('pagar-subcat')?.value||'';
   let f=cache.despesas;
-  if(!ini&&!fim&&!cat&&!subcat) {
-    // Mostra mês atual + lançamentos recorrentes futuros pendentes
-    const mesAtualStr=today().substring(0,7);
-    f=f.filter(d=>{
-      if(isMesAtual(d.venc)) return true;
-      // Recorrente futuro ainda pendente
-      if(d.rep&&d.rep!==''&&d.rep!=='parcelado'&&d.status!=='Pago'&&d.venc>today()) return true;
-      // Parcelas futuras pendentes
-      if(d.rep==='parcelado'&&d.status!=='Pago'&&d.venc>today()) return true;
-      return false;
-    });
-  }
+  if(!ini&&!fim&&!cat&&!subcat) f=f.filter(d=>isMesAtual(d.venc));
   if(ini) f=f.filter(d=>d.venc&&d.venc>=ini);
   if(fim) f=f.filter(d=>d.venc&&d.venc<=fim);
   if(cat) f=f.filter(d=>d.cat===cat);
@@ -1662,7 +1664,6 @@ async function saveRec() {
   if(!editId) data.status='Pendente';
   try {
     await saveDoc('receitas', editId||null, data);
-    closeModal('rec'); showToast(editId?'Receita atualizada!':'Receita lançada!');
     // Gerar lançamentos futuros de repetição (apenas em novo)
     if(!editId && rep && venc) {
       const qtd=parseInt(repQtd)||1;
@@ -1672,6 +1673,7 @@ async function saveRec() {
         await saveDoc('receitas',null,clone);
       }
     }
+    closeModal('rec'); showToast(editId?'Receita atualizada!':'Receita lançada!');
     await loadCollection('receitas');
     renderLancamentos(); renderDashboard();
   } catch(e) { showToast('Erro ao salvar.','err'); console.error(e); }
@@ -1735,7 +1737,6 @@ async function saveDesp() {
       closeModal('desp'); showToast(`${parcN} parcelas criadas!`);
     } else {
       await saveDoc('despesas', editId||null, data);
-      closeModal('desp'); showToast(editId?'Despesa atualizada!':'Despesa lançada!');
       // Gerar lançamentos futuros de repetição (apenas em novo)
       if(!editId && rep && rep!=='parcelado' && venc) {
         const qtd=parseInt(repFim)||1;
@@ -1745,6 +1746,7 @@ async function saveDesp() {
           await saveDoc('despesas',null,clone);
         }
       }
+      closeModal('desp'); showToast(editId?'Despesa atualizada!':'Despesa lançada!');
     }
     await loadCollection('despesas');
     renderLancamentos(); renderDashboard();
@@ -2219,14 +2221,6 @@ function renderRelatorios() {
     const pLabels=Object.keys(catMap);
     destroyChart('chart-pizza');
     chartInst['chart-pizza']=new Chart(document.getElementById('chart-pizza'),{type:'doughnut',data:{labels:pLabels.length?pLabels:['Sem dados'],datasets:[{data:pLabels.length?pLabels.map(k=>catMap[k]):[1],backgroundColor:['rgba(160,120,80,.8)','rgba(220,38,38,.6)','rgba(234,179,8,.7)','rgba(59,130,246,.7)','rgba(109,90,172,.7)','rgba(5,150,105,.7)'].slice(0,Math.max(pLabels.length,1)),borderWidth:2,borderColor:'#fff'}]},options:{responsive:true,plugins:{legend:{position:'right'}}}});
-
-    // Gráfico consolidado por tipo de categoria (Fixo/Variável/Extra)
-    const tipoMap={Fixo:0,Variável:0,Extra:0};
-    cache.despesas.filter(d=>{const dt=new Date((d.venc||'')+'T12:00:00');return dt.getMonth()===mesSel&&dt.getFullYear()===ano;}).forEach(d=>{const t=d.cat;if(t in tipoMap)tipoMap[t]+=pm(d.val);else tipoMap['Extra']+=pm(d.val);});
-    const tipoLabels=Object.keys(tipoMap).filter(k=>tipoMap[k]>0);
-    const tipoVals=tipoLabels.map(k=>tipoMap[k]);
-    destroyChart('chart-cat-tipo');
-    chartInst['chart-cat-tipo']=new Chart(document.getElementById('chart-cat-tipo'),{type:'bar',data:{labels:tipoLabels.length?tipoLabels:['Sem dados'],datasets:[{label:'Despesas',data:tipoLabels.length?tipoVals:[0],backgroundColor:['rgba(107,114,128,.7)','rgba(234,179,8,.7)','rgba(220,38,38,.6)'],borderRadius:6}]},options:{indexAxis:'y',responsive:true,plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>' '+ctx.parsed.x.toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}}},scales:{x:{beginAtZero:true,ticks:{callback:v=>v.toLocaleString('pt-BR',{style:'currency',currency:'BRL',minimumFractionDigits:0})}}}}});
 
     let semR=0,semD=0;
     const s6=[];for(let i=5;i>=0;i--){const m=(mesAtual()-i+12)%12;s6.push({l:meses[m],mn:mesesN[m],r:recByMes[m],d:despByMes[m]});semR+=recByMes[m];semD+=despByMes[m];}
