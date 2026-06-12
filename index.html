@@ -1624,7 +1624,16 @@ async function toggleRec(id) {
   if(novoStatus==='Pago') r.dataPagamento=today(); else r.dataPagamento='';
   try { await db.collection('receitas_bev').doc(id).update(updateData); }
   catch(e) { showToast('Erro ao atualizar.','err'); return; }
-  renderLancamentos(); renderDashboard(); showToast(`Marcado como ${novoStatus}`);
+  renderLancamentos();
+  renderDashboard();
+  if(novoStatus==='Pago') {
+    // Migra automaticamente para aba Movimentação
+    const tabEl=document.querySelector('.tab[onclick*="switchTab('mov'"]');
+    if(tabEl) switchTab('mov', tabEl);
+    showToast('Recebido ✓ — movido para Movimentação','ok');
+  } else {
+    showToast('Marcado como Pendente');
+  }
 }
 async function toggleDesp(id) {
   const d=cache.despesas.find(x=>x.id===id); if(!d) return;
@@ -1636,7 +1645,16 @@ async function toggleDesp(id) {
   if(novoStatus==='Pago') d.dataPagamento=today(); else d.dataPagamento='';
   try { await db.collection('despesas_bev').doc(id).update(updateData); }
   catch(e) { showToast('Erro ao atualizar.','err'); return; }
-  renderLancamentos(); renderDashboard(); showToast(`Marcado como ${novoStatus}`);
+  renderLancamentos();
+  renderDashboard();
+  if(novoStatus==='Pago') {
+    // Migra automaticamente para aba Movimentação
+    const tabEl=document.querySelector('.tab[onclick*="switchTab('mov'"]');
+    if(tabEl) switchTab('mov', tabEl);
+    showToast('Pago ✓ — movido para Movimentação','ok');
+  } else {
+    showToast('Marcado como Pendente');
+  }
 }
 
 // ══ SWIPE ══
