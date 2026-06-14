@@ -1614,6 +1614,13 @@ function switchRelatTab(id,el) {
 }
 
 // ══ STATUS TOGGLE ══
+function irParaMov() {
+  // Encontra a aba Movimentação pelo texto, sem depender de atributo onclick
+  const tabs = document.querySelectorAll('.tab');
+  let tabMov = null;
+  tabs.forEach(t => { if(t.textContent.includes('Movimentação')) tabMov = t; });
+  if(tabMov) switchTab('mov', tabMov);
+}
 async function toggleRec(id) {
   const r=cache.receitas.find(x=>x.id===id); if(!r) return;
   const novoStatus=r.status==='Pago'?'Pendente':'Pago';
@@ -1627,9 +1634,7 @@ async function toggleRec(id) {
   renderLancamentos();
   renderDashboard();
   if(novoStatus==='Pago') {
-    // Migra automaticamente para aba Movimentação
-    const tabEl=document.querySelector('.tab[onclick*="switchTab('mov'"]');
-    if(tabEl) switchTab('mov', tabEl);
+    irParaMov();
     showToast('Recebido ✓ — movido para Movimentação','ok');
   } else {
     showToast('Marcado como Pendente');
@@ -1648,9 +1653,7 @@ async function toggleDesp(id) {
   renderLancamentos();
   renderDashboard();
   if(novoStatus==='Pago') {
-    // Migra automaticamente para aba Movimentação
-    const tabEl=document.querySelector('.tab[onclick*="switchTab('mov'"]');
-    if(tabEl) switchTab('mov', tabEl);
+    irParaMov();
     showToast('Pago ✓ — movido para Movimentação','ok');
   } else {
     showToast('Marcado como Pendente');
