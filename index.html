@@ -467,9 +467,7 @@ body.dark .card,.dark .kpi,.dark .fin-stat,.dark .ind,.dark .conta-card,.dark .m
           </div>
           <div class="tab-panel active" id="tab-a-rec">
             <div class="qf">
-              <button class="qf-btn active" onclick="filtrarRec('todos',this)">Todos</button>
-              <button class="qf-btn" onclick="filtrarRec('pendente',this)">Pendentes</button>
-              <button class="qf-btn" onclick="filtrarRec('pago',this)">Recebidos</button>
+              <button class="qf-btn active" onclick="filtrarRec('todos',this)">Todos Pendentes</button>
               <button class="qf-btn" onclick="filtrarRec('vencido',this)">Vencidos</button>
             </div>
             <div class="search-wrap"><span class="search-icon">🔍</span><input class="search-input" placeholder="Buscar receita..." oninput="buscarRec(this.value)"></div>
@@ -478,8 +476,7 @@ body.dark .card,.dark .kpi,.dark .fin-stat,.dark .ind,.dark .conta-card,.dark .m
           </div>
           <div class="tab-panel" id="tab-a-pagar">
             <div class="qf">
-              <button class="qf-btn active" onclick="filtrarDesp('todos',this)">Todos</button>
-              <button class="qf-btn" onclick="filtrarDesp('pendente',this)">Pendentes</button>
+              <button class="qf-btn active" onclick="filtrarDesp('todos',this)">Todos Pendentes</button>
               <button class="qf-btn" onclick="filtrarDesp('vencido',this)">Vencidos</button>
               <button class="qf-btn" onclick="filtrarDesp('mes',this)">Este mês</button>
             </div>
@@ -1354,8 +1351,8 @@ function renderLancamentos() {
   const sd=document.getElementById('sticky-desp');if(sd)sd.textContent=fm(totalDesp);
   const ss=document.getElementById('sticky-saldo');if(ss){ss.textContent=fm(saldo);ss.style.color=saldo>=0?'var(--green)':'var(--red)';}
   recCache=recMes; despCache=despMes;
-  renderRecTable(recMes);
-  renderDespTable(despMes);
+  renderRecTable(recMes.filter(r=>r.status!=='Pago'));
+  renderDespTable(despMes.filter(d=>d.status!=='Pago'));
   renderProjecao();
 }
 
@@ -1557,18 +1554,17 @@ function renderProjecao() {
 function filtrarRec(tipo,el) {
   document.querySelectorAll('#tab-a-rec .qf-btn').forEach(b=>b.classList.remove('active')); el.classList.add('active');
   const h=today();
-  let f=cache.receitas.filter(r=>isMesAtual(r.venc));
-  if(tipo==='pendente')f=f.filter(r=>r.status!=='Pago');
-  else if(tipo==='pago')f=f.filter(r=>r.status==='Pago');
-  else if(tipo==='vencido')f=f.filter(r=>r.status!=='Pago'&&r.venc<h);
+  // A Receber: sempre exclui recebidos — eles ficam em Movimentação
+  let f=cache.receitas.filter(r=>isMesAtual(r.venc)&&r.status!=='Pago');
+  if(tipo==='vencido')f=f.filter(r=>r.venc<h);
   renderRecTable(f);
 }
 function filtrarDesp(tipo,el) {
   document.querySelectorAll('#tab-a-pagar .qf-btn').forEach(b=>b.classList.remove('active')); el.classList.add('active');
   const h=today();
-  let f=cache.despesas.filter(d=>isMesAtual(d.venc));
-  if(tipo==='pendente')f=f.filter(d=>d.status!=='Pago');
-  else if(tipo==='vencido')f=f.filter(d=>d.status!=='Pago'&&d.venc<h);
+  // A Pagar: sempre exclui pagos — eles ficam em Movimentação
+  let f=cache.despesas.filter(d=>isMesAtual(d.venc)&&d.status!=='Pago');
+  if(tipo==='vencido')f=f.filter(d=>d.venc<h);
   renderDespTable(f);
 }
 function buscarRec(q){renderRecTable(q?cache.receitas.filter(r=>r.desc?.toLowerCase().includes(q.toLowerCase())):cache.receitas.filter(r=>isMesAtual(r.venc)));}
@@ -1579,7 +1575,7 @@ function filtrarDespDataBase() {
   const cat=document.getElementById('pagar-cat')?.value||'';
   const subcat=document.getElementById('pagar-subcat')?.value||'';
   let f=cache.despesas;
-  if(!ini&&!fim&&!cat&&!subcat) f=f.filter(d=>isMesAtual(d.venc));
+  if(!ini&&!fim&&!cat&&!subcat) f=f.filter(d=>isMesAtual(d.venc)&&d.status!=='Pago');
   if(ini) f=f.filter(d=>d.venc&&d.venc>=ini);
   if(fim) f=f.filter(d=>d.venc&&d.venc<=fim);
   if(cat) f=f.filter(d=>d.cat===cat);
@@ -1594,7 +1590,7 @@ function limparFiltrosPagar(){
   const ids=['pagar-ini','pagar-fim','pagar-cat','pagar-subcat'];
   ids.forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   document.querySelector('#tab-a-pagar .qf-btn')?.classList.add('active');
-  renderDespTable(cache.despesas.filter(d=>isMesAtual(d.venc)));
+  renderDespTable(cache.despesas.filter(d=>isMesAtual(d.venc)&&d.status!=='Pago'));
 }
 
 // ══ TABS ══
