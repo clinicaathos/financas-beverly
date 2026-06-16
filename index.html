@@ -467,7 +467,9 @@ body.dark .card,.dark .kpi,.dark .fin-stat,.dark .ind,.dark .conta-card,.dark .m
           </div>
           <div class="tab-panel active" id="tab-a-rec">
             <div class="qf">
-              <button class="qf-btn active" onclick="filtrarRec('todos',this)">Todos Pendentes</button>
+              <button class="qf-btn active" onclick="filtrarRec('todos',this)">Todos</button>
+              <button class="qf-btn" onclick="filtrarRec('pendente',this)">Pendentes</button>
+              <button class="qf-btn" onclick="filtrarRec('pago',this)">Recebidos</button>
               <button class="qf-btn" onclick="filtrarRec('vencido',this)">Vencidos</button>
             </div>
             <div class="search-wrap"><span class="search-icon">🔍</span><input class="search-input" placeholder="Buscar receita..." oninput="buscarRec(this.value)"></div>
@@ -476,7 +478,8 @@ body.dark .card,.dark .kpi,.dark .fin-stat,.dark .ind,.dark .conta-card,.dark .m
           </div>
           <div class="tab-panel" id="tab-a-pagar">
             <div class="qf">
-              <button class="qf-btn active" onclick="filtrarDesp('todos',this)">Todos Pendentes</button>
+              <button class="qf-btn active" onclick="filtrarDesp('todos',this)">Todos</button>
+              <button class="qf-btn" onclick="filtrarDesp('pendente',this)">Pendentes</button>
               <button class="qf-btn" onclick="filtrarDesp('vencido',this)">Vencidos</button>
               <button class="qf-btn" onclick="filtrarDesp('mes',this)">Este mês</button>
             </div>
@@ -687,6 +690,9 @@ body.dark .card,.dark .kpi,.dark .fin-stat,.dark .ind,.dark .conta-card,.dark .m
               <div><div style="font-size:.82rem;font-weight:500">Orçamento</div><div style="font-size:.7rem;color:var(--text-3)">Avisar ao atingir (%)</div></div>
               <input type="number" id="cfg-alerta-orc" value="80" min="1" max="100" style="width:60px;padding:5px;border:1.5px solid var(--border);border-radius:7px;font-family:'DM Sans',sans-serif;font-size:.82rem;text-align:center;background:var(--white);color:var(--text)">
             </div>
+            <div style="display:flex;justify-content:flex-end;padding-top:.5rem">
+              <button class="btn btn-gold btn-sm" onclick="saveAlertas()">Salvar alertas</button>
+            </div>
           </div>
           <div class="card">
             <div style="font-size:.82rem;font-weight:700;color:var(--gold);margin-bottom:.875rem">Aparência & Conta</div>
@@ -747,15 +753,18 @@ body.dark .card,.dark .kpi,.dark .fin-stat,.dark .ind,.dark .conta-card,.dark .m
       <div class="form-group"><label class="form-label">Repetição</label>
         <select class="form-select" id="r-rep" onchange="toggleRepRec()">
           <option value="">Sem repetição</option>
+          <option value="mensal">Mensal (mesmo dia)</option>
+          <option value="semanal">Semanal (mesmo dia da semana)</option>
+          <option value="quinzenal">Quinzenal</option>
           <option value="diario">Diário</option>
-          <option value="semanal">Semanal</option>
-          <option value="mensal">Mensal</option>
           <option value="anual">Anual</option>
-          <option value="personalizado">Personalizado</option>
+          <option value="dia-mes">Todo dia X do mês</option>
+          <option value="personalizado">Personalizado (a cada N dias)</option>
         </select>
       </div>
       <div class="form-group" id="r-rep-fim-grp" style="display:none"><label class="form-label" id="r-rep-fim-label">Quantas repetições</label><input class="form-input" type="number" id="r-rep-fim" min="1" max="999" placeholder="Ex: 12"></div>
       <div class="form-group" id="r-rep-custom-grp" style="display:none"><label class="form-label">Intervalo (em dias)</label><input class="form-input" type="number" id="r-rep-custom-dias" min="1" max="999" placeholder="Ex: 45"></div>
+      <div class="form-group" id="r-rep-diames-grp" style="display:none"><label class="form-label">Dia do mês</label><input class="form-input" type="number" id="r-rep-diames" min="1" max="31" placeholder="Ex: 5, 10, 25"></div>
     </div>
     <div class="form-group"><label class="form-label">Observação</label><input class="form-input" id="r-obs" placeholder="Opcional"></div>
     <div class="modal-footer">
@@ -1216,8 +1225,9 @@ function updateSubcatSelects() {
 function renderDashboard() {
   const recMes = cache.receitas.filter(r=>isMesAtual(r.venc));
   const despMes = cache.despesas.filter(d=>isMesAtual(d.venc));
-  const totalRec = recMes.reduce((s,r)=>s+pm(r.val),0);
-  const totalDesp = despMes.reduce((s,d)=>s+pm(d.val),0);
+  // Apenas lançamentos efetivados (Pago/Recebido) compõem os totais realizados
+  const totalRec = recMes.filter(r=>r.status==='Pago').reduce((s,r)=>s+pm(r.val),0);
+  const totalDesp = despMes.filter(d=>d.status==='Pago').reduce((s,d)=>s+pm(d.val),0);
   const saldo = totalRec - totalDesp;
   const pendentes = despMes.filter(d=>d.status!=='Pago').length;
 
@@ -1225,7 +1235,7 @@ function renderDashboard() {
   sid('d-investido', fm(totalInv));
   sid('d-investido-sub', `${cache.investimentos.length} investimento(s)`);
 
-  sid('d-rec', fm(totalRec)); sid('d-rec-sub', `${recMes.length} lançamentos`);
+  sid('d-rec', fm(totalRec)); sid('d-rec-sub', `${recMes.filter(r=>r.status==='Pago').length} recebido(s)`);
   sid('d-desp', fm(totalDesp));
   const ds = document.getElementById('d-saldo');
   if(ds) { ds.textContent=fm(saldo); ds.style.color=saldo>=0?'var(--green)':'var(--red)'; }
@@ -1341,8 +1351,9 @@ function renderLancamentos() {
   document.getElementById('fin-titulo').textContent=`Lançamentos — ${meses[mesAtual()]} ${anoAtual()}`;
   const recMes=cache.receitas.filter(r=>isMesAtual(r.venc));
   const despMes=cache.despesas.filter(d=>isMesAtual(d.venc));
-  const totalRec=recMes.reduce((s,r)=>s+pm(r.val),0);
-  const totalDesp=despMes.reduce((s,d)=>s+pm(d.val),0);
+  // Totais: apenas realizados (Pago/Recebido)
+  const totalRec=recMes.filter(r=>r.status==='Pago').reduce((s,r)=>s+pm(r.val),0);
+  const totalDesp=despMes.filter(d=>d.status==='Pago').reduce((s,d)=>s+pm(d.val),0);
   const saldo=totalRec-totalDesp;
   document.getElementById('f-rec').textContent=fm(totalRec);
   document.getElementById('f-desp').textContent=fm(totalDesp);
@@ -1350,7 +1361,8 @@ function renderLancamentos() {
   const sr=document.getElementById('sticky-rec');if(sr)sr.textContent=fm(totalRec);
   const sd=document.getElementById('sticky-desp');if(sd)sd.textContent=fm(totalDesp);
   const ss=document.getElementById('sticky-saldo');if(ss){ss.textContent=fm(saldo);ss.style.color=saldo>=0?'var(--green)':'var(--red)';}
-  recCache=recMes; despCache=despMes;
+  // recCache inclui todas as receitas pendentes (qualquer mês) para A Receber
+  recCache=cache.receitas.filter(r=>r.status!=='Pago'); despCache=despMes;
   renderRecTable(recMes.filter(r=>r.status!=='Pago'));
   renderDespTable(despMes.filter(d=>d.status!=='Pago'));
   renderProjecao();
@@ -1554,17 +1566,18 @@ function renderProjecao() {
 function filtrarRec(tipo,el) {
   document.querySelectorAll('#tab-a-rec .qf-btn').forEach(b=>b.classList.remove('active')); el.classList.add('active');
   const h=today();
-  // A Receber: sempre exclui recebidos — eles ficam em Movimentação
-  let f=cache.receitas.filter(r=>isMesAtual(r.venc)&&r.status!=='Pago');
-  if(tipo==='vencido')f=f.filter(r=>r.venc<h);
+  let f=cache.receitas.filter(r=>isMesAtual(r.venc));
+  if(tipo==='pendente')f=f.filter(r=>r.status!=='Pago');
+  else if(tipo==='pago')f=f.filter(r=>r.status==='Pago');
+  else if(tipo==='vencido')f=f.filter(r=>r.status!=='Pago'&&r.venc<h);
   renderRecTable(f);
 }
 function filtrarDesp(tipo,el) {
   document.querySelectorAll('#tab-a-pagar .qf-btn').forEach(b=>b.classList.remove('active')); el.classList.add('active');
   const h=today();
-  // A Pagar: sempre exclui pagos — eles ficam em Movimentação
-  let f=cache.despesas.filter(d=>isMesAtual(d.venc)&&d.status!=='Pago');
-  if(tipo==='vencido')f=f.filter(d=>d.venc<h);
+  let f=cache.despesas.filter(d=>isMesAtual(d.venc));
+  if(tipo==='pendente')f=f.filter(d=>d.status!=='Pago');
+  else if(tipo==='vencido')f=f.filter(d=>d.status!=='Pago'&&d.venc<h);
   renderDespTable(f);
 }
 function buscarRec(q){renderRecTable(q?cache.receitas.filter(r=>r.desc?.toLowerCase().includes(q.toLowerCase())):cache.receitas.filter(r=>isMesAtual(r.venc)));}
@@ -1575,7 +1588,7 @@ function filtrarDespDataBase() {
   const cat=document.getElementById('pagar-cat')?.value||'';
   const subcat=document.getElementById('pagar-subcat')?.value||'';
   let f=cache.despesas;
-  if(!ini&&!fim&&!cat&&!subcat) f=f.filter(d=>isMesAtual(d.venc)&&d.status!=='Pago');
+  if(!ini&&!fim&&!cat&&!subcat) f=f.filter(d=>isMesAtual(d.venc));
   if(ini) f=f.filter(d=>d.venc&&d.venc>=ini);
   if(fim) f=f.filter(d=>d.venc&&d.venc<=fim);
   if(cat) f=f.filter(d=>d.cat===cat);
@@ -1590,7 +1603,7 @@ function limparFiltrosPagar(){
   const ids=['pagar-ini','pagar-fim','pagar-cat','pagar-subcat'];
   ids.forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   document.querySelector('#tab-a-pagar .qf-btn')?.classList.add('active');
-  renderDespTable(cache.despesas.filter(d=>isMesAtual(d.venc)&&d.status!=='Pago'));
+  renderDespTable(cache.despesas.filter(d=>isMesAtual(d.venc)));
 }
 
 // ══ TABS ══
@@ -1610,6 +1623,59 @@ function switchRelatTab(id,el) {
 }
 
 // ══ STATUS TOGGLE ══
+// ══ EDIÇÃO RECORRENTE — escopo ══
+let _escopoCtx = null; // {tipo:'rec'|'desp', id, dados}
+
+function pedirEscopoEdicao(tipo, id, dadosFn) {
+  _escopoCtx = {tipo, id, dadosFn};
+  document.getElementById('modal-escopo').classList.add('open');
+}
+
+async function confirmarEscopoEdicao(escopo) {
+  closeModal('escopo');
+  if(!_escopoCtx) return;
+  const {tipo, id, dadosFn} = _escopoCtx;
+  _escopoCtx = null;
+  const dados = dadosFn();
+  if(!dados) return;
+
+  const colecao = tipo==='rec' ? 'receitas' : 'despesas';
+  const cache_list = tipo==='rec' ? cache.receitas : cache.despesas;
+  const item = cache_list.find(x=>x.id===id);
+  if(!item) return;
+
+  try {
+    if(escopo==='somente') {
+      // Edita só este documento
+      await db.collection(colecao+'_bev').doc(id).update({...dados, updatedAt:firebase.firestore.FieldValue.serverTimestamp()});
+      const idx=cache_list.findIndex(x=>x.id===id);
+      if(idx>=0) cache_list[idx]={...cache_list[idx],...dados};
+      showToast('Lançamento atualizado!');
+    } else {
+      // Edita este e todos os futuros da mesma série (desc+rep iguais, venc >= deste)
+      const descOriginal=item.desc; const repOriginal=item.rep; const vencCorte=item.venc||'';
+      const futuros=cache_list.filter(x=>
+        x.rep===repOriginal && x.desc===descOriginal &&
+        (x.venc||'')>=vencCorte && x.status!=='Pago'
+      );
+      const batch=db.batch();
+      for(const f of futuros) {
+        const ref=db.collection(colecao+'_bev').doc(f.id);
+        // Mantém a data original de cada ocorrência, atualiza o resto
+        const upd={...dados, venc:f.venc, mes:f.mes, ano:f.ano, updatedAt:firebase.firestore.FieldValue.serverTimestamp()};
+        batch.update(ref, upd);
+        const idx=cache_list.findIndex(x=>x.id===f.id);
+        if(idx>=0) cache_list[idx]={...cache_list[idx],...upd};
+      }
+      await batch.commit();
+      showToast(`${futuros.length} lançamento(s) atualizado(s)!`);
+    }
+    if(tipo==='rec') closeModal('rec'); else closeModal('desp');
+    await loadCollection(colecao);
+    renderLancamentos(); renderDashboard();
+  } catch(e) { showToast('Erro ao salvar.','err'); console.error(e); }
+}
+
 function irParaMov() {
   // Encontra a aba Movimentação pelo texto, sem depender de atributo onclick
   const tabs = document.querySelectorAll('.tab');
@@ -1629,12 +1695,7 @@ async function toggleRec(id) {
   catch(e) { showToast('Erro ao atualizar.','err'); return; }
   renderLancamentos();
   renderDashboard();
-  if(novoStatus==='Pago') {
-    irParaMov();
-    showToast('Recebido ✓ — movido para Movimentação','ok');
-  } else {
-    showToast('Marcado como Pendente');
-  }
+  showToast(novoStatus==='Pago'?'Recebido ✓':'Marcado como Pendente');
 }
 async function toggleDesp(id) {
   const d=cache.despesas.find(x=>x.id===id); if(!d) return;
@@ -1648,12 +1709,7 @@ async function toggleDesp(id) {
   catch(e) { showToast('Erro ao atualizar.','err'); return; }
   renderLancamentos();
   renderDashboard();
-  if(novoStatus==='Pago') {
-    irParaMov();
-    showToast('Pago ✓ — movido para Movimentação','ok');
-  } else {
-    showToast('Marcado como Pendente');
-  }
+  showToast(novoStatus==='Pago'?'Pago ✓':'Marcado como Pendente');
 }
 
 // ══ SWIPE ══
@@ -1679,6 +1735,8 @@ function toggleRepRec() {
   document.getElementById('r-rep-fim-grp').style.display=rep?'block':'none';
   const cg=document.getElementById('r-rep-custom-grp');
   if(cg) cg.style.display=rep==='personalizado'?'block':'none';
+  const dg=document.getElementById('r-rep-diames-grp');
+  if(dg) dg.style.display=rep==='dia-mes'?'block':'none';
   const lbl=document.getElementById('r-rep-fim-label');
   if(lbl) lbl.textContent=rep==='personalizado'?'Quantidade de repetições':'Quantas repetições';
 }
@@ -1707,7 +1765,19 @@ async function saveRec() {
   const data={desc,cat:document.getElementById('r-cat').value,subcat:document.getElementById('r-subcat').value||'',val,conta:document.getElementById('r-conta').value||'',venc,obs:document.getElementById('r-obs').value||'',rep:rep||'',mes:venc?new Date(venc+'T12:00:00').getMonth():mesAtual(),ano:venc?new Date(venc+'T12:00:00').getFullYear():anoAtual()};
   if(!editId) data.status='Pendente';
   try {
-    await saveDoc('receitas', editId||null, data);
+    // Se é edição de recorrente, perguntar escopo
+    if(editId) {
+      const original=cache.receitas.find(x=>x.id===editId);
+      if(original && original.rep && original.rep!=='') {
+        pedirEscopoEdicao('rec', editId, ()=>data);
+        return; // Aguarda confirmação no modal
+      }
+      await saveDoc('receitas', editId, data);
+      closeModal('rec'); showToast('Receita atualizada!');
+      await loadCollection('receitas');
+      renderLancamentos(); renderDashboard();
+      return;
+    }
     // Gerar lançamentos futuros de repetição (apenas em novo)
     if(!editId && rep && venc) {
       const qtd=parseInt(repQtd)||1;
@@ -1716,6 +1786,17 @@ async function saveRec() {
         const diasInt=parseInt(document.getElementById('r-rep-custom-dias')?.value)||30;
         let cur=new Date(venc+'T12:00:00');
         for(let i=0;i<qtd;i++){cur=new Date(cur.getTime()+diasInt*86400000);datas.push(cur.toISOString().split('T')[0]);}
+      } else if(rep==='dia-mes'){
+        const dia=parseInt(document.getElementById('r-rep-diames')?.value)||1;
+        let cur=new Date(venc+'T12:00:00');
+        for(let i=0;i<qtd;i++){
+          cur.setMonth(cur.getMonth()+1);
+          cur.setDate(Math.min(dia,new Date(cur.getFullYear(),cur.getMonth()+1,0).getDate()));
+          datas.push(cur.toISOString().split('T')[0]);
+        }
+      } else if(rep==='quinzenal'){
+        let cur=new Date(venc+'T12:00:00');
+        for(let i=0;i<qtd;i++){cur=new Date(cur.getTime()+15*86400000);datas.push(cur.toISOString().split('T')[0]);}
       } else {
         datas=gerarDatasRepQtd(venc,rep,qtd);
       }
@@ -1776,6 +1857,19 @@ async function saveDesp() {
   const data={desc,cat:document.getElementById('d-cat').value,subcat:document.getElementById('d-subcat').value||'',val,conta:document.getElementById('d-conta').value||'',venc,obs:document.getElementById('d-obs').value||'',rep:rep||'',mes:venc?new Date(venc+'T12:00:00').getMonth():mesAtual(),ano:venc?new Date(venc+'T12:00:00').getFullYear():anoAtual()};
   if(!editId) data.status='Pendente';
   try {
+    // Se é edição de recorrente, perguntar escopo
+    if(editId) {
+      const original=cache.despesas.find(x=>x.id===editId);
+      if(original && original.rep && original.rep!=='' && original.rep!=='parcelado') {
+        pedirEscopoEdicao('desp', editId, ()=>data);
+        return; // Aguarda confirmação no modal
+      }
+      await saveDoc('despesas', editId, data);
+      closeModal('desp'); showToast('Despesa atualizada!');
+      await loadCollection('despesas');
+      renderLancamentos(); renderDashboard();
+      return;
+    }
     if(!editId && rep==='parcelado' && parcN>=2 && venc) {
       // Parcelado: gera N parcelas, cada uma no mês seguinte
       for(let i=0;i<parcN;i++) {
@@ -2003,7 +2097,22 @@ async function delOrc() {
 }
 
 // ══ CONFIGURAÇÕES ══
+function saveAlertas() {
+  const dias=document.getElementById('cfg-alerta-dias')?.value||'3';
+  const orc=document.getElementById('cfg-alerta-orc')?.value||'80';
+  localStorage.setItem('bev_alerta_dias', dias);
+  localStorage.setItem('bev_alerta_orc', orc);
+  showToast('Alertas salvos!');
+  renderDashboard();
+}
+function loadAlertas() {
+  const dias=localStorage.getItem('bev_alerta_dias');
+  const orc=localStorage.getItem('bev_alerta_orc');
+  if(dias){ const el=document.getElementById('cfg-alerta-dias'); if(el) el.value=dias; }
+  if(orc){ const el=document.getElementById('cfg-alerta-orc'); if(el) el.value=orc; }
+}
 function renderConfiguracoes() {
+  loadAlertas();
   renderCategorias();
   const isDark=document.body.classList.contains('dark');
   const t=document.getElementById('cfg-dark-toggle'), k=document.getElementById('cfg-dark-knob');
@@ -2437,5 +2546,26 @@ function gerarFiltrado() {
   showToast(`${todos.length} resultado(s).`);
 }
 </script>
+
+<!-- Modal escopo de edição recorrente -->
+<div class="modal-overlay" id="modal-escopo" onclick="closeMBg(event,'escopo')">
+  <div class="modal-box modal-sm">
+    <div class="modal-title">Editar recorrência</div>
+    <p style="font-size:.85rem;color:var(--text-2);margin-bottom:1.25rem">Este lançamento faz parte de uma recorrência. O que deseja alterar?</p>
+    <div style="display:flex;flex-direction:column;gap:.625rem">
+      <button class="btn btn-ghost" style="justify-content:flex-start;text-align:left" onclick="confirmarEscopoEdicao('somente')">
+        <span style="font-weight:700;display:block">Somente este lançamento</span>
+        <span style="font-size:.72rem;color:var(--text-3)">Altera apenas a ocorrência selecionada</span>
+      </button>
+      <button class="btn btn-gold" style="justify-content:flex-start;text-align:left" onclick="confirmarEscopoEdicao('futuros')">
+        <span style="font-weight:700;display:block">Este e todos os próximos</span>
+        <span style="font-size:.72rem;color:var(--white);opacity:.85">Atualiza esta ocorrência e todas as futuras da série</span>
+      </button>
+    </div>
+    <div class="modal-footer" style="margin-top:1rem">
+      <button class="btn btn-ghost" onclick="closeModal('escopo')">Cancelar</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>
