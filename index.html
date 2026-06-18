@@ -1703,8 +1703,7 @@ async function toggleRec(id) {
   renderLancamentos();
   renderDashboard();
   if(novoStatus==='Pago') {
-    irParaMov();
-    showToast('Recebido ✓ — movido para Movimentação','ok');
+    showToast('Recebido ✓','ok');
   } else {
     showToast('Marcado como Pendente');
   }
@@ -1722,8 +1721,7 @@ async function toggleDesp(id) {
   renderLancamentos();
   renderDashboard();
   if(novoStatus==='Pago') {
-    irParaMov();
-    showToast('Pago ✓ — movido para Movimentação','ok');
+    showToast('Pago ✓','ok');
   } else {
     showToast('Marcado como Pendente');
   }
