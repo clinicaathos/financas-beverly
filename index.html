@@ -1585,23 +1585,61 @@ function filtrarDesp(tipo,el) {
   else if(tipo==='vencido')f=f.filter(d=>d.status!=='Pago'&&d.venc<h);
   renderDespTable(f);
 }
-function reaplicarFiltroAtivoRec() {
-  const ativo=document.querySelector('#tab-a-rec .qf-btn.active');
-  const tipo=ativo&&ativo.textContent.trim()==='Vencidos'?'vencido':'todos';
-  const h=today();
-  let f=[...recCache];
-  if(tipo==='vencido') f=f.filter(r=>r.venc&&r.venc<h);
-  renderRecTable(f);
+// Recalcula apenas os totais/KPIs do mês (cards do topo + sticky), sem reconstruir as tabelas.
+// Usado após dar baixa, para o usuário permanecer na mesma lista sem o lançamento sumir da tela.
+function atualizarTotaisLancamentos() {
+  const recMes=cache.receitas.filter(r=>isMesAtual(r.venc));
+  const despMes=cache.despesas.filter(d=>isMesAtual(d.venc));
+  const totalRec=recMes.filter(r=>r.status==='Pago').reduce((s,r)=>s+pm(r.val),0);
+  const totalDesp=despMes.filter(d=>d.status==='Pago').reduce((s,d)=>s+pm(d.val),0);
+  const saldo=totalRec-totalDesp;
+  const fr=document.getElementById('f-rec'); if(fr) fr.textContent=fm(totalRec);
+  const fd2=document.getElementById('f-desp'); if(fd2) fd2.textContent=fm(totalDesp);
+  const fs=document.getElementById('f-saldo'); if(fs){ fs.textContent=fm(saldo); fs.style.color=saldo>=0?'var(--green)':'var(--red)'; }
+  const sr=document.getElementById('sticky-rec'); if(sr) sr.textContent=fm(totalRec);
+  const sd=document.getElementById('sticky-desp'); if(sd) sd.textContent=fm(totalDesp);
+  const ss=document.getElementById('sticky-saldo'); if(ss){ ss.textContent=fm(saldo); ss.style.color=saldo>=0?'var(--green)':'var(--red)'; }
 }
-function reaplicarFiltroAtivoDesp() {
-  const ativo=document.querySelector('#tab-a-pagar .qf-btn.active');
-  const label=ativo?ativo.textContent.trim():'Todos';
-  const tipo=label==='Pendentes'?'pendente':label==='Vencidos'?'vencido':'todos';
-  const h=today();
-  let f=cache.despesas.filter(d=>isMesAtual(d.venc));
-  if(tipo==='pendente')f=f.filter(d=>d.status!=='Pago');
-  else if(tipo==='vencido')f=f.filter(d=>d.status!=='Pago'&&d.venc<h);
-  renderDespTable(f);
+// Atualiza somente o badge/status da linha/cartão já renderizado na tela, em vez de
+// refiltrar a lista de A Receber — assim o lançamento continua visível ali até a próxima
+// navegação, e o usuário pode dar baixa em vários itens seguidos sem a tela mudar.
+function atualizarBadgeRec(id, novoStatus) {
+  const label = novoStatus==='Pago' ? 'Recebido' : 'Pendente';
+  document.querySelectorAll(`#rec-table [onclick="toggleRec('${id}')"]`).forEach(b=>{
+    b.textContent=label;
+    b.classList.toggle('bg-green', novoStatus==='Pago');
+    b.classList.toggle('bg-yellow', novoStatus!=='Pago');
+  });
+  const card=document.querySelector(`#rec-cards .mob-card[data-id="${id}"]`);
+  if(card){
+    card.dataset.status=novoStatus;
+    const hint=card.querySelector('.swipe-hint');
+    if(hint){ hint.textContent = novoStatus==='Pago' ? 'Pendente' : 'Recebido ✓'; hint.classList.toggle('warn', novoStatus==='Pago'); hint.classList.toggle('ok', novoStatus!=='Pago'); }
+    card.querySelectorAll(`[onclick="toggleRec('${id}')"]`).forEach(b=>{
+      b.textContent=label;
+      b.classList.toggle('bg-green', novoStatus==='Pago');
+      b.classList.toggle('bg-yellow', novoStatus!=='Pago');
+    });
+  }
+}
+function atualizarBadgeDesp(id, novoStatus) {
+  const label = novoStatus==='Pago' ? 'Pago' : 'Pendente';
+  document.querySelectorAll(`#desp-table [onclick="toggleDesp('${id}')"]`).forEach(b=>{
+    b.textContent=label;
+    b.classList.toggle('bg-green', novoStatus==='Pago');
+    b.classList.toggle('bg-yellow', novoStatus!=='Pago');
+  });
+  const card=document.querySelector(`#desp-cards .mob-card[data-id="${id}"]`);
+  if(card){
+    card.dataset.status=novoStatus;
+    const hint=card.querySelector('.swipe-hint');
+    if(hint){ hint.textContent = novoStatus==='Pago' ? 'Pendente' : 'Pago ✓'; hint.classList.toggle('warn', novoStatus==='Pago'); hint.classList.toggle('ok', novoStatus!=='Pago'); }
+    card.querySelectorAll(`[onclick="toggleDesp('${id}')"]`).forEach(b=>{
+      b.textContent=label;
+      b.classList.toggle('bg-green', novoStatus==='Pago');
+      b.classList.toggle('bg-yellow', novoStatus!=='Pago');
+    });
+  }
 }
 function buscarRec(q){renderRecTable(q?cache.receitas.filter(r=>r.desc?.toLowerCase().includes(q.toLowerCase())):cache.receitas.filter(r=>isMesAtual(r.venc)));}
 function buscarDesp(q){renderDespTable(q?cache.despesas.filter(d=>d.desc?.toLowerCase().includes(q.toLowerCase())):filtrarDespDataBase());}
@@ -1656,8 +1694,11 @@ async function toggleRec(id) {
   if(novoStatus==='Pago') r.dataPagamento=today(); else r.dataPagamento='';
   try { await db.collection('receitas_bev').doc(id).update(updateData); }
   catch(e) { showToast('Erro ao atualizar.','err'); return; }
-  renderLancamentos();
-  reaplicarFiltroAtivoRec();
+  // Atualiza só os totais/KPIs e o badge da própria linha — sem refiltrar a lista,
+  // para o lançamento não sumir da tela de A Receber assim que é dado baixa.
+  atualizarTotaisLancamentos();
+  atualizarBadgeRec(id, novoStatus);
+  const idxRec=recCache.findIndex(x=>x.id===id); if(idxRec>=0) recCache[idxRec]=r;
   renderDashboard();
   if(novoStatus==='Pago') {
     showToast('Recebido ✓','ok');
@@ -1675,8 +1716,11 @@ async function toggleDesp(id) {
   if(novoStatus==='Pago') d.dataPagamento=today(); else d.dataPagamento='';
   try { await db.collection('despesas_bev').doc(id).update(updateData); }
   catch(e) { showToast('Erro ao atualizar.','err'); return; }
-  renderLancamentos();
-  reaplicarFiltroAtivoDesp();
+  // Atualiza só os totais/KPIs e o badge da própria linha — sem refiltrar a lista,
+  // para o lançamento não sumir da tela de A Pagar assim que é dado baixa.
+  atualizarTotaisLancamentos();
+  atualizarBadgeDesp(id, novoStatus);
+  const idxDesp=despCache.findIndex(x=>x.id===id); if(idxDesp>=0) despCache[idxDesp]=d;
   renderDashboard();
   if(novoStatus==='Pago') {
     showToast('Pago ✓','ok');
