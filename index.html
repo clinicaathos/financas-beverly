@@ -373,7 +373,6 @@ body.dark .card,.dark .kpi,.dark .fin-stat,.dark .ind,.dark .conta-card,.dark .m
       <div class="nav-item active" onclick="goPage('dashboard',this)"><div class="nav-icon">⊞</div>Dashboard</div>
       <div class="sb-sec">Financeiro</div>
       <div class="nav-item" onclick="goPage('lancamentos',this)"><div class="nav-icon">⊟</div>Lançamentos</div>
-      <div class="nav-item" onclick="goPage('contas',this)"><div class="nav-icon">⊙</div>Contas</div>
       <div class="nav-item" onclick="goPage('orcamento',this)"><div class="nav-icon">◫</div>Orçamento</div>
       <div class="nav-item" onclick="goPage('metas',this)"><div class="nav-icon">◈</div>Metas</div>
       <div class="nav-item" onclick="goPage('investimentos',this)"><div class="nav-icon">◉</div>Investimentos</div>
@@ -417,7 +416,6 @@ body.dark .card,.dark .kpi,.dark .fin-stat,.dark .ind,.dark .conta-card,.dark .m
           <button class="shortcut" onclick="goPage('lancamentos',null);setTimeout(()=>openModal('rec'),80)"><div class="sc-ic">💰</div>Lançar Receita</button>
           <button class="shortcut" onclick="goPage('lancamentos',null);setTimeout(()=>openModal('desp'),80)"><div class="sc-ic">💸</div>Lançar Despesa</button>
           <button class="shortcut" onclick="goPage('investimentos',null);setTimeout(()=>openModal('inv'),80)"><div class="sc-ic">📈</div>Novo Investimento</button>
-          <button class="shortcut" onclick="goPage('contas',null);setTimeout(()=>openModal('conta'),80)"><div class="sc-ic">🏦</div>Nova Conta</button>
         </div>
         <div class="kpi-grid">
           <div class="kpi"><div class="kpi-label">Receita do Mês</div><div class="kpi-val" style="color:var(--gold)" id="d-rec">—</div><div class="kpi-sub" id="d-rec-sub">carregando</div></div>
@@ -425,10 +423,6 @@ body.dark .card,.dark .kpi,.dark .fin-stat,.dark .ind,.dark .conta-card,.dark .m
           <div class="kpi"><div class="kpi-label">Saldo do Mês</div><div class="kpi-val" id="d-saldo">—</div><div class="kpi-sub" id="d-saldo-sub">—</div></div>
           <div class="kpi"><div class="kpi-label">A Pagar</div><div class="kpi-val" style="color:var(--yellow)" id="d-pagar">—</div><div class="kpi-sub">pendentes</div></div>
           <div class="kpi"><div class="kpi-label">Total Investido</div><div class="kpi-val" style="color:var(--blue)" id="d-investido">—</div><div class="kpi-sub" id="d-investido-sub">em carteira</div></div>
-        </div>
-        <div class="card" style="margin-bottom:1rem">
-          <div class="card-title">Saldo por Conta <button class="btn btn-ghost btn-sm" onclick="goPage('contas',null)">Ver todas</button></div>
-          <div id="d-contas" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:.75rem"></div>
         </div>
         <div class="dash-2col">
           <div class="card">
@@ -531,19 +525,6 @@ body.dark .card,.dark .kpi,.dark .fin-stat,.dark .ind,.dark .conta-card,.dark .m
             <div class="card" id="proj-rec"></div>
             <div style="font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-3);margin:.875rem 0 .5rem">Despesas previstas</div>
             <div class="card" id="proj-desp"></div>
-          </div>
-        </div>
-      </div>
-
-      <!-- CONTAS -->
-      <div class="page" id="page-contas">
-        <div class="sec-header"><span class="sec-title">Contas & Carteiras</span><button class="btn btn-gold" onclick="openModal('conta')">+ Nova Conta</button></div>
-        <div class="contas-grid" id="contas-grid"></div>
-        <div class="card" style="margin-top:.75rem">
-          <div style="display:flex;justify-content:space-between;align-items:center">
-            <div><div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text-3);margin-bottom:3px">Patrimônio Total</div>
-            <div style="font-family:'DM Serif Display',serif;font-size:1.8rem;color:var(--gold)" id="patrimonio-total">—</div></div>
-            <div style="font-size:.75rem;color:var(--text-3)">soma de todas as contas</div>
           </div>
         </div>
       </div>
@@ -770,10 +751,7 @@ body.dark .card,.dark .kpi,.dark .fin-stat,.dark .ind,.dark .conta-card,.dark .m
       <div class="form-group"><label class="form-label">Categoria</label><select class="form-select" id="r-cat"><option>Fixa</option><option>Variável</option><option>Extra</option></select></div>
       <div class="form-group"><label class="form-label">Valor (R$)</label><input class="form-input" id="r-val" placeholder="0,00" type="text"></div>
     </div>
-    <div class="form-row">
-      <div class="form-group"><label class="form-label">Vencimento</label><input class="form-input" type="date" id="r-venc"></div>
-      <div class="form-group"><label class="form-label">Conta</label><select class="form-select" id="r-conta"><option value="">Selecionar...</option></select></div>
-    </div>
+    <div class="form-group"><label class="form-label">Vencimento</label><input class="form-input" type="date" id="r-venc"></div>
     <div class="form-group"><label class="form-label">Subcategoria</label><select class="form-select" id="r-subcat"><option value="">Nenhuma</option></select></div>
     <div class="form-row">
       <div class="form-group"><label class="form-label">Repetição</label>
@@ -807,10 +785,7 @@ body.dark .card,.dark .kpi,.dark .fin-stat,.dark .ind,.dark .conta-card,.dark .m
       <div class="form-group"><label class="form-label">Categoria</label><select class="form-select" id="d-cat"><option>Fixo</option><option>Variável</option><option>Extra</option></select></div>
       <div class="form-group"><label class="form-label">Valor (R$)</label><input class="form-input" id="d-val" placeholder="0,00" type="text"></div>
     </div>
-    <div class="form-row">
-      <div class="form-group"><label class="form-label">Vencimento</label><input class="form-input" type="date" id="d-venc"></div>
-      <div class="form-group"><label class="form-label">Conta</label><select class="form-select" id="d-conta"><option value="">Selecionar...</option></select></div>
-    </div>
+    <div class="form-group"><label class="form-label">Vencimento</label><input class="form-input" type="date" id="d-venc"></div>
     <div class="form-group"><label class="form-label">Subcategoria</label><select class="form-select" id="d-subcat"><option value="">Nenhuma</option></select></div>
     <div class="form-row">
       <div class="form-group"><label class="form-label">Repetição</label>
@@ -834,24 +809,6 @@ body.dark .card,.dark .kpi,.dark .fin-stat,.dark .ind,.dark .conta-card,.dark .m
       <button class="btn btn-danger btn-sm" id="d-del-btn" style="display:none" onclick="delDesp()">Excluir</button>
       <button class="btn btn-ghost" onclick="closeModal('desp')">Cancelar</button>
       <button class="btn btn-gold" onclick="saveDesp()">Salvar</button>
-    </div>
-  </div>
-</div>
-
-<div class="modal-overlay" id="modal-conta" onclick="closeMBg(event,'conta')">
-  <div class="modal-box modal-sm">
-    <div class="modal-title" id="conta-modal-title">Nova Conta</div>
-    <input type="hidden" id="conta-edit-id">
-    <div class="form-group"><label class="form-label">Nome</label><input class="form-input" id="c-nome" placeholder="Ex: Nubank, Caixa, Carteira..."></div>
-    <div class="form-row">
-      <div class="form-group"><label class="form-label">Tipo</label><select class="form-select" id="c-tipo"><option>Conta Corrente</option><option>Poupança</option><option>Conta Digital</option><option>Carteira</option><option>Investimento</option></select></div>
-      <div class="form-group"><label class="form-label">Saldo (R$)</label><input class="form-input" id="c-saldo" placeholder="0,00" type="text"></div>
-    </div>
-    <div class="form-group"><label class="form-label">Observação</label><input class="form-input" id="c-obs" placeholder="Banco, instituição..."></div>
-    <div class="modal-footer">
-      <button class="btn btn-danger btn-sm" id="c-del-btn" style="display:none" onclick="delConta()">Excluir</button>
-      <button class="btn btn-ghost" onclick="closeModal('conta')">Cancelar</button>
-      <button class="btn btn-gold" onclick="saveConta()">Salvar</button>
     </div>
   </div>
 </div>
@@ -1186,7 +1143,7 @@ function closeModal(id) { document.getElementById('modal-'+id)?.classList.remove
 function closeMBg(e,id) { if(e.target===e.currentTarget) closeModal(id); }
 
 // ══ NAVIGATION ══
-const pageTitles = {dashboard:'Dashboard',lancamentos:'Lançamentos',contas:'Contas & Carteiras',orcamento:'Orçamento Mensal',metas:'Metas Financeiras',investimentos:'Investimentos',relatorios:'Relatórios',lembretes:'Lembretes', configuracoes:'Configurações'};
+const pageTitles = {dashboard:'Dashboard',lancamentos:'Lançamentos',orcamento:'Orçamento Mensal',metas:'Metas Financeiras',investimentos:'Investimentos',relatorios:'Relatórios',lembretes:'Lembretes', configuracoes:'Configurações'};
 function goPage(id, el) {
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
@@ -1197,7 +1154,6 @@ function goPage(id, el) {
   document.getElementById('fin-sticky').classList.toggle('show', id==='lancamentos');
   closeSidebar();
   if(id==='lancamentos') renderLancamentos();
-  if(id==='contas') renderContas();
   if(id==='metas') renderMetas();
   if(id==='orcamento') renderOrcamento();
   if(id==='investimentos') renderInvestimentos();
@@ -1229,8 +1185,6 @@ if(localStorage.getItem('bev-dark')==='1') { document.body.classList.add('dark')
 
 // ══ SELECTS ══
 function updateContaSelects() {
-  const opts = '<option value="">Selecionar...</option>' + cache.contas.map(c=>`<option value="${c.id}">${c.nome}</option>`).join('');
-  ['r-conta','d-conta'].forEach(id=>{ const el=document.getElementById(id); if(el) el.innerHTML=opts; });
   const fc = document.getElementById('fil-conta');
   if(fc) fc.innerHTML = '<option value="">Todas as contas</option>' + cache.contas.map(c=>`<option value="${c.id}">${c.nome}</option>`).join('');
 }
@@ -1267,15 +1221,6 @@ function renderDashboard() {
   if(ds) { ds.textContent=fm(saldo); ds.style.color=saldo>=0?'var(--green)':'var(--red)'; }
   sid('d-saldo-sub', saldo>=0?'resultado positivo':'resultado negativo');
   sid('d-pagar', String(pendentes));
-
-  // Contas
-  const dc = document.getElementById('d-contas');
-  if(dc) dc.innerHTML = cache.contas.length ? cache.contas.map(c=>`
-    <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:.75rem">
-      <div style="font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-3);margin-bottom:2px">${c.nome}</div>
-      <div style="font-family:'DM Serif Display',serif;font-size:1.1rem;color:${pm(c.saldo)>=0?'var(--gold)':'var(--red)'}">${fm(c.saldo)}</div>
-      <div style="font-size:.65rem;color:var(--text-3)">${c.tipo||''}</div>
-    </div>`).join('') : '<div style="font-size:.8rem;color:var(--text-3)">Nenhuma conta cadastrada.</div>';
 
   // Lembretes: integração no dashboard
   const lemAlertaDias = parseInt(localStorage.getItem('bev_alerta_dias')||'3');
@@ -1640,6 +1585,24 @@ function filtrarDesp(tipo,el) {
   else if(tipo==='vencido')f=f.filter(d=>d.status!=='Pago'&&d.venc<h);
   renderDespTable(f);
 }
+function reaplicarFiltroAtivoRec() {
+  const ativo=document.querySelector('#tab-a-rec .qf-btn.active');
+  const tipo=ativo&&ativo.textContent.trim()==='Vencidos'?'vencido':'todos';
+  const h=today();
+  let f=[...recCache];
+  if(tipo==='vencido') f=f.filter(r=>r.venc&&r.venc<h);
+  renderRecTable(f);
+}
+function reaplicarFiltroAtivoDesp() {
+  const ativo=document.querySelector('#tab-a-pagar .qf-btn.active');
+  const label=ativo?ativo.textContent.trim():'Todos';
+  const tipo=label==='Pendentes'?'pendente':label==='Vencidos'?'vencido':'todos';
+  const h=today();
+  let f=cache.despesas.filter(d=>isMesAtual(d.venc));
+  if(tipo==='pendente')f=f.filter(d=>d.status!=='Pago');
+  else if(tipo==='vencido')f=f.filter(d=>d.status!=='Pago'&&d.venc<h);
+  renderDespTable(f);
+}
 function buscarRec(q){renderRecTable(q?cache.receitas.filter(r=>r.desc?.toLowerCase().includes(q.toLowerCase())):cache.receitas.filter(r=>isMesAtual(r.venc)));}
 function buscarDesp(q){renderDespTable(q?cache.despesas.filter(d=>d.desc?.toLowerCase().includes(q.toLowerCase())):filtrarDespDataBase());}
 function filtrarDespDataBase() {
@@ -1683,13 +1646,6 @@ function switchRelatTab(id,el) {
 }
 
 // ══ STATUS TOGGLE ══
-function irParaMov() {
-  // Encontra a aba Movimentação pelo texto, sem depender de atributo onclick
-  const tabs = document.querySelectorAll('.tab');
-  let tabMov = null;
-  tabs.forEach(t => { if(t.textContent.includes('Movimentação')) tabMov = t; });
-  if(tabMov) switchTab('mov', tabMov);
-}
 async function toggleRec(id) {
   const r=cache.receitas.find(x=>x.id===id); if(!r) return;
   const novoStatus=r.status==='Pago'?'Pendente':'Pago';
@@ -1701,6 +1657,7 @@ async function toggleRec(id) {
   try { await db.collection('receitas_bev').doc(id).update(updateData); }
   catch(e) { showToast('Erro ao atualizar.','err'); return; }
   renderLancamentos();
+  reaplicarFiltroAtivoRec();
   renderDashboard();
   if(novoStatus==='Pago') {
     showToast('Recebido ✓','ok');
@@ -1719,6 +1676,7 @@ async function toggleDesp(id) {
   try { await db.collection('despesas_bev').doc(id).update(updateData); }
   catch(e) { showToast('Erro ao atualizar.','err'); return; }
   renderLancamentos();
+  reaplicarFiltroAtivoDesp();
   renderDashboard();
   if(novoStatus==='Pago') {
     showToast('Pago ✓','ok');
@@ -1775,7 +1733,7 @@ async function saveRec() {
   const venc=document.getElementById('r-venc').value;
   const rep=document.getElementById('r-rep').value;
   const repQtd=document.getElementById('r-rep-fim').value;
-  const data={desc,cat:document.getElementById('r-cat').value,subcat:document.getElementById('r-subcat').value||'',val,conta:document.getElementById('r-conta').value||'',venc,obs:document.getElementById('r-obs').value||'',rep:rep||'',mes:venc?new Date(venc+'T12:00:00').getMonth():mesAtual(),ano:venc?new Date(venc+'T12:00:00').getFullYear():anoAtual()};
+  const data={desc,cat:document.getElementById('r-cat').value,subcat:document.getElementById('r-subcat').value||'',val,venc,obs:document.getElementById('r-obs').value||'',rep:rep||'',mes:venc?new Date(venc+'T12:00:00').getMonth():mesAtual(),ano:venc?new Date(venc+'T12:00:00').getFullYear():anoAtual()};
   if(!editId) data.status='Pendente';
   try {
     await saveDoc('receitas', editId||null, data);
@@ -1813,7 +1771,7 @@ function editRec(id) {
   const rRep=document.getElementById('r-rep'); if(rRep) { rRep.value=r.rep||''; toggleRepRec(); }
   document.getElementById('r-rep-fim').value='';
   updateContaSelects(); updateSubcatSelects();
-  setTimeout(()=>{ document.getElementById('r-conta').value=r.conta||''; document.getElementById('r-subcat').value=r.subcat||''; },50);
+  setTimeout(()=>{ document.getElementById('r-subcat').value=r.subcat||''; },50);
   document.getElementById('modal-rec').classList.add('open');
 }
 async function delRec() {
@@ -1844,7 +1802,7 @@ async function saveDesp() {
   const rep=document.getElementById('d-rep').value;
   const repFim=document.getElementById('d-rep-fim').value;
   const parcN=parseInt(document.getElementById('d-parc').value)||0;
-  const data={desc,cat:document.getElementById('d-cat').value,subcat:document.getElementById('d-subcat').value||'',val,conta:document.getElementById('d-conta').value||'',venc,obs:document.getElementById('d-obs').value||'',rep:rep||'',mes:venc?new Date(venc+'T12:00:00').getMonth():mesAtual(),ano:venc?new Date(venc+'T12:00:00').getFullYear():anoAtual()};
+  const data={desc,cat:document.getElementById('d-cat').value,subcat:document.getElementById('d-subcat').value||'',val,venc,obs:document.getElementById('d-obs').value||'',rep:rep||'',mes:venc?new Date(venc+'T12:00:00').getMonth():mesAtual(),ano:venc?new Date(venc+'T12:00:00').getFullYear():anoAtual()};
   if(!editId) data.status='Pendente';
   try {
     if(!editId && rep==='parcelado' && parcN>=2 && venc) {
@@ -1886,7 +1844,7 @@ function editDesp(id) {
   document.getElementById('d-obs').value=d.obs||'';
   const dRep=document.getElementById('d-rep'); if(dRep) { dRep.value=d.rep||''; toggleRepDesp(); }
   updateContaSelects(); updateSubcatSelects();
-  setTimeout(()=>{ document.getElementById('d-conta').value=d.conta||''; document.getElementById('d-subcat').value=d.subcat||''; },50);
+  setTimeout(()=>{ document.getElementById('d-subcat').value=d.subcat||''; },50);
   document.getElementById('modal-desp').classList.add('open');
 }
 async function delDesp() {
@@ -1899,54 +1857,6 @@ async function quickDelDesp(id) {
   if(!confirm('Excluir?')) return;
   try { await deleteDoc('despesas',id); renderLancamentos(); renderDashboard(); }
   catch(e){ showToast('Erro.','err'); }
-}
-
-// ══ CONTAS ══
-function renderContas() {
-  const grid=document.getElementById('contas-grid');
-  if(!grid) return;
-  const total=cache.contas.reduce((s,c)=>s+pm(c.saldo),0);
-  grid.innerHTML=cache.contas.length?cache.contas.map(c=>`
-    <div class="conta-card" onclick="editConta('${c.id}')">
-      <button class="conta-del" onclick="event.stopPropagation();quickDelConta('${c.id}')">×</button>
-      <div class="conta-nome">${c.nome}</div>
-      <div class="conta-saldo" style="color:${pm(c.saldo)>=0?'var(--gold)':'var(--red)'}">${fm(c.saldo)}</div>
-      <div class="conta-tipo-label">${c.tipo||''}${c.obs?' · '+c.obs:''}</div>
-    </div>`).join(''):'<div style="font-size:.82rem;color:var(--text-3)">Nenhuma conta.</div>';
-  const pt=document.getElementById('patrimonio-total'); if(pt) pt.textContent=fm(total);
-}
-async function saveConta() {
-  const editId=document.getElementById('conta-edit-id').value;
-  const nome=document.getElementById('c-nome').value.trim();
-  if(!nome){showToast('Nome obrigatório.','err');return;}
-  const data={nome,tipo:document.getElementById('c-tipo').value,saldo:document.getElementById('c-saldo').value||'0',obs:document.getElementById('c-obs').value};
-  try {
-    await saveDoc('contas',editId||null,data);
-    closeModal('conta'); showToast(editId?'Conta atualizada!':'Conta criada!');
-    updateContaSelects(); renderContas(); renderDashboard();
-  } catch(e){showToast('Erro.','err');}
-}
-function editConta(id) {
-  const c=cache.contas.find(x=>x.id===id); if(!c) return;
-  document.getElementById('conta-edit-id').value=id;
-  document.getElementById('conta-modal-title').textContent='Editar Conta';
-  document.getElementById('c-del-btn').style.display='inline-flex';
-  document.getElementById('c-nome').value=c.nome||'';
-  document.getElementById('c-tipo').value=c.tipo||'Conta Corrente';
-  document.getElementById('c-saldo').value=c.saldo||'';
-  document.getElementById('c-obs').value=c.obs||'';
-  document.getElementById('modal-conta').classList.add('open');
-}
-async function delConta() {
-  const id=document.getElementById('conta-edit-id').value;
-  if(!id||!confirm('Excluir conta?')) return;
-  try { await deleteDoc('contas',id); closeModal('conta'); showToast('Conta excluída.'); updateContaSelects(); renderContas(); renderDashboard(); }
-  catch(e){showToast('Erro.','err');}
-}
-async function quickDelConta(id) {
-  if(!confirm('Excluir conta?')) return;
-  try { await deleteDoc('contas',id); updateContaSelects(); renderContas(); renderDashboard(); }
-  catch(e){showToast('Erro.','err');}
 }
 
 // ══ METAS ══
