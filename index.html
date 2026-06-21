@@ -1694,11 +1694,11 @@ async function toggleRec(id) {
   if(novoStatus==='Pago') r.dataPagamento=today(); else r.dataPagamento='';
   try { await db.collection('receitas_bev').doc(id).update(updateData); }
   catch(e) { showToast('Erro ao atualizar.','err'); return; }
-  // Atualiza só os totais/KPIs e o badge da própria linha — sem refiltrar a lista,
-  // para o lançamento não sumir da tela de A Receber assim que é dado baixa.
+  // Após a baixa, o lançamento sai de "A Receber" (que mostra só pendentes) e passa
+  // a constar em Movimentações. Refiltra recCache e re-renderiza para refletir isso.
+  recCache=cache.receitas.filter(x=>x.status!=='Pago');
+  renderRecTable(recCache);
   atualizarTotaisLancamentos();
-  atualizarBadgeRec(id, novoStatus);
-  const idxRec=recCache.findIndex(x=>x.id===id); if(idxRec>=0) recCache[idxRec]=r;
   renderDashboard();
   if(novoStatus==='Pago') {
     showToast('Recebido ✓','ok');
@@ -1716,11 +1716,11 @@ async function toggleDesp(id) {
   if(novoStatus==='Pago') d.dataPagamento=today(); else d.dataPagamento='';
   try { await db.collection('despesas_bev').doc(id).update(updateData); }
   catch(e) { showToast('Erro ao atualizar.','err'); return; }
-  // Atualiza só os totais/KPIs e o badge da própria linha — sem refiltrar a lista,
-  // para o lançamento não sumir da tela de A Pagar assim que é dado baixa.
-  atualizarTotaisLancamentos();
-  atualizarBadgeDesp(id, novoStatus);
+  // Após a baixa, o lançamento sai de "A Pagar" (que mostra só pendentes) e passa
+  // a constar em Movimentações. Refiltra a partir do mês atual e re-renderiza.
   const idxDesp=despCache.findIndex(x=>x.id===id); if(idxDesp>=0) despCache[idxDesp]=d;
+  renderDespTable(despCache.filter(x=>x.status!=='Pago'));
+  atualizarTotaisLancamentos();
   renderDashboard();
   if(novoStatus==='Pago') {
     showToast('Pago ✓','ok');
