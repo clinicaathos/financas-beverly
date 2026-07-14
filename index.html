@@ -699,7 +699,8 @@ body.dark .card,.dark .kpi,.dark .fin-stat,.dark .ind,.dark .conta-card,.dark .m
               <button class="btn btn-gold" onclick="exportarExcel()">📥 Exportar Excel</button>
               <button class="btn btn-ghost" onclick="exportarJSON()">💾 Backup JSON</button>
             </div>
-            <div id="backup-status" style="font-size:.72rem;color:var(--text-3);margin-top:.625rem"></div>
+            <div style="font-size:.68rem;color:var(--text-3);margin-top:.625rem;padding-top:.5rem;border-top:1px solid var(--border)">🔄 Um backup automático dos dados também é salvo a cada 3 horas enquanto o app estiver aberto no navegador.</div>
+            <div id="backup-status" style="font-size:.72rem;color:var(--text-3);margin-top:.375rem"></div>
           </div>
           <div class="card">
             <div style="font-size:.82rem;font-weight:700;color:var(--gold);margin-bottom:.875rem">Aparência & Conta</div>
@@ -759,6 +760,7 @@ body.dark .card,.dark .kpi,.dark .fin-stat,.dark .ind,.dark .conta-card,.dark .m
           <option value="">Sem repetição</option>
           <option value="diario">Diário</option>
           <option value="semanal">Semanal</option>
+          <option value="quinzenal">Quinzenal</option>
           <option value="mensal">Mensal</option>
           <option value="anual">Anual</option>
           <option value="personalizado">Personalizado</option>
@@ -793,6 +795,7 @@ body.dark .card,.dark .kpi,.dark .fin-stat,.dark .ind,.dark .conta-card,.dark .m
           <option value="">Sem repetição</option>
           <option value="diario">Diário</option>
           <option value="semanal">Semanal</option>
+          <option value="quinzenal">Quinzenal</option>
           <option value="mensal">Mensal</option>
           <option value="anual">Anual</option>
           <option value="parcelado">Parcelado</option>
@@ -1060,6 +1063,7 @@ async function initApp() {
   renderLancamentos();
   const rms = document.getElementById('relat-mes');
   if(rms) rms.value = String(mesAtual());
+  iniciarBackupAutomatico();
 }
 
 async function loadCollection(nome) {
@@ -1359,9 +1363,11 @@ function renderLancamentos() {
   const ss=document.getElementById('sticky-saldo');if(ss){ss.textContent=fm(saldo);ss.style.color=saldo>=0?'var(--green)':'var(--red)';}
   // recCache = TODAS as pendentes (qualquer mês) — A Receber mostra futuras também
   recCache=cache.receitas.filter(r=>r.status!=='Pago');
-  despCache=despMes;
+  // A Pagar: pendentes do mês atual + qualquer pendente vencida de meses anteriores (some só quando for paga)
+  const hojeStrLanc=today();
+  despCache=cache.despesas.filter(d=>d.status!=='Pago' && (isMesAtual(d.venc) || (d.venc && d.venc<hojeStrLanc)));
   renderRecTable(recCache);
-  renderDespTable(despMes.filter(d=>d.status!=='Pago'));
+  renderDespTable(despCache);
   renderProjecao();
 }
 
@@ -1580,9 +1586,10 @@ function filtrarRec(tipo,el) {
 function filtrarDesp(tipo,el) {
   document.querySelectorAll('#tab-a-pagar .qf-btn').forEach(b=>b.classList.remove('active')); el.classList.add('active');
   const h=today();
-  let f=cache.despesas.filter(d=>isMesAtual(d.venc));
+  // Base: mês atual + qualquer pendente vencida de meses anteriores (some da lista só quando paga)
+  let f=cache.despesas.filter(d=>d.status!=='Pago' && (isMesAtual(d.venc) || (d.venc && d.venc<h)));
   if(tipo==='pendente')f=f.filter(d=>d.status!=='Pago');
-  else if(tipo==='vencido')f=f.filter(d=>d.status!=='Pago'&&d.venc<h);
+  else if(tipo==='vencido')f=cache.despesas.filter(d=>d.status!=='Pago'&&d.venc&&d.venc<h);
   renderDespTable(f);
 }
 // Recalcula apenas os totais/KPIs do mês (cards do topo + sticky), sem reconstruir as tabelas.
@@ -1762,6 +1769,7 @@ function gerarDatasRepQtd(vencBase, rep, qtd) {
   for(let i=0;i<n;i++) {
     if(rep==='diario') cur.setDate(cur.getDate()+1);
     else if(rep==='semanal') cur.setDate(cur.getDate()+7);
+    else if(rep==='quinzenal') cur.setDate(cur.getDate()+14);
     else if(rep==='mensal') cur.setMonth(cur.getMonth()+1);
     else if(rep==='anual') cur.setFullYear(cur.getFullYear()+1);
     datas.push(cur.toISOString().split('T')[0]);
@@ -1850,27 +1858,48 @@ async function saveDesp() {
   if(!editId) data.status='Pendente';
   try {
     if(!editId && rep==='parcelado' && parcN>=2 && venc) {
-      // Parcelado: gera N parcelas, cada uma no mês seguinte
+      // Parcelado: gera N parcelas, cada uma no mês seguinte, todas ligadas pela mesma serieId
+      const serieId='ser_'+Date.now()+'_'+Math.random().toString(36).slice(2,7);
       for(let i=0;i<parcN;i++) {
         const d=new Date(venc+'T12:00:00');
         d.setMonth(d.getMonth()+i);
         const dStr=d.toISOString().split('T')[0];
-        const clone={...data,desc:`${desc} - ${i+1}/${parcN}`,venc:dStr,status:'Pendente',rep:'parcelado',parcela:`${i+1}/${parcN}`,mes:d.getMonth(),ano:d.getFullYear()};
+        const clone={...data,desc:`${desc} - ${i+1}/${parcN}`,venc:dStr,status:'Pendente',rep:'parcelado',parcela:`${i+1}/${parcN}`,serieId,mes:d.getMonth(),ano:d.getFullYear()};
         await saveDoc('despesas',null,clone);
       }
       closeModal('desp'); showToast(`${parcN} parcelas criadas!`);
-    } else {
-      await saveDoc('despesas', editId||null, data);
-      // Gerar lançamentos futuros de repetição (apenas em novo)
-      if(!editId && rep && rep!=='parcelado' && venc) {
-        const qtd=parseInt(repFim)||1;
-        const datas=gerarDatasRepQtd(venc,rep,qtd);
-        for(const d of datas) {
-          const clone={...data,venc:d,status:'Pendente',rep:rep,mes:new Date(d+'T12:00:00').getMonth(),ano:new Date(d+'T12:00:00').getFullYear()};
-          await saveDoc('despesas',null,clone);
-        }
+    } else if(!editId && rep && rep!=='parcelado' && venc) {
+      // Recorrência aberta: gera as ocorrências futuras ligadas pela mesma serieId
+      const serieId='ser_'+Date.now()+'_'+Math.random().toString(36).slice(2,7);
+      await saveDoc('despesas', null, {...data, serieId});
+      const qtd=parseInt(repFim)||1;
+      const datas=gerarDatasRepQtd(venc,rep,qtd);
+      for(const d of datas) {
+        const clone={...data,venc:d,status:'Pendente',rep:rep,serieId,mes:new Date(d+'T12:00:00').getMonth(),ano:new Date(d+'T12:00:00').getFullYear()};
+        await saveDoc('despesas',null,clone);
       }
-      closeModal('desp'); showToast(editId?'Despesa atualizada!':'Despesa lançada!');
+      closeModal('desp'); showToast('Despesa lançada!');
+    } else if(editId) {
+      const original=cache.despesas.find(x=>x.id===editId);
+      if(original && original.serieId) {
+        // Lançamento pertence a uma recorrência: perguntar o escopo da alteração
+        const aplicarTodas=confirm('Esta despesa faz parte de uma recorrência.\n\nOK = aplicar a alteração a esta e a todas as ocorrências futuras (mesma descrição/categoria/valor).\nCancelar = alterar apenas esta ocorrência.');
+        if(aplicarTodas) {
+          const camposComuns={desc:data.desc,cat:data.cat,subcat:data.subcat,val:data.val,obs:data.obs};
+          const futuras=cache.despesas.filter(x=>x.serieId===original.serieId && x.venc>=original.venc);
+          for(const f of futuras) {
+            await saveDoc('despesas', f.id, f.id===editId?{...camposComuns,venc,mes:data.mes,ano:data.ano,status:data.status||f.status}:camposComuns);
+          }
+        } else {
+          await saveDoc('despesas', editId, data);
+        }
+      } else {
+        await saveDoc('despesas', editId, data);
+      }
+      closeModal('desp'); showToast('Despesa atualizada!');
+    } else {
+      await saveDoc('despesas', null, data);
+      closeModal('desp'); showToast('Despesa lançada!');
     }
     await loadCollection('despesas');
     renderLancamentos(); renderDashboard();
@@ -2509,6 +2538,14 @@ function gerarFiltrado() {
         </select>
       </div>
     </div>
+    <div class="form-group"><label class="form-label">Repetição</label>
+      <select class="form-select" id="lem-rep">
+        <option value="">Sem repetição</option>
+        <option value="quinzenal">Quinzenal</option>
+        <option value="mensal">Mensal (todo mês, no mesmo dia)</option>
+      </select>
+      <div style="font-size:.68rem;color:var(--text-3);margin-top:.3rem">Ao concluir um lembrete recorrente, o próximo já é criado automaticamente.</div>
+    </div>
     <div class="form-group"><label class="form-label">Status</label>
       <select class="form-select" id="lem-status">
         <option value="Pendente">Pendente</option>
@@ -2574,13 +2611,21 @@ function renderLembretes() {
     </div>`;
   }).join('');
 }
+function proximaDataLembrete(venc,rep) {
+  const cur=new Date(venc+'T12:00:00');
+  if(rep==='quinzenal') cur.setDate(cur.getDate()+14);
+  else if(rep==='mensal') cur.setMonth(cur.getMonth()+1);
+  return cur.toISOString().split('T')[0];
+}
 async function saveLembrete() {
   const editId=document.getElementById('lem-edit-id').value;
   const titulo=document.getElementById('lem-titulo').value.trim();
   if(!titulo){showToast('Título obrigatório.','err');return;}
-  const data={titulo,desc:document.getElementById('lem-desc').value||'',venc:document.getElementById('lem-venc').value||'',prior:document.getElementById('lem-prior').value,status:document.getElementById('lem-status').value,criadoEm:editId?undefined:today()};
+  const rep=document.getElementById('lem-rep').value;
+  const data={titulo,desc:document.getElementById('lem-desc').value||'',venc:document.getElementById('lem-venc').value||'',prior:document.getElementById('lem-prior').value,status:document.getElementById('lem-status').value,rep:rep||'',criadoEm:editId?undefined:today()};
   if(!editId) data.criadoEm=today();
   try {
+    if(!editId && rep && data.venc) data.serieId='ser_'+Date.now()+'_'+Math.random().toString(36).slice(2,7);
     await saveDoc('lembretes',editId||null,data);
     closeModal('lembrete'); showToast(editId?'Lembrete atualizado!':'Lembrete criado!');
     await loadCollection('lembretes');
@@ -2597,6 +2642,7 @@ function editLembrete(id) {
   document.getElementById('lem-venc').value=l.venc||'';
   document.getElementById('lem-prior').value=l.prior||'Média';
   document.getElementById('lem-status').value=l.status||'Pendente';
+  const lemRep=document.getElementById('lem-rep'); if(lemRep) lemRep.value=l.rep||'';
   document.getElementById('modal-lembrete').classList.add('open');
 }
 async function delLembrete() {
@@ -2611,6 +2657,13 @@ async function concluirLembrete(id) {
     await db.collection('lembretes_bev').doc(id).update({status:'Concluído',updatedAt:firebase.firestore.FieldValue.serverTimestamp()});
     l.status='Concluído';
     showToast('Lembrete concluído ✓');
+    // Recorrência: se este lembrete se repete, cria automaticamente a próxima ocorrência
+    if(l.rep && l.venc) {
+      const novaData=proximaDataLembrete(l.venc,l.rep);
+      const novo={titulo:l.titulo,desc:l.desc||'',venc:novaData,prior:l.prior||'Média',status:'Pendente',rep:l.rep,serieId:l.serieId||('ser_'+Date.now()+'_'+Math.random().toString(36).slice(2,7)),criadoEm:today()};
+      await saveDoc('lembretes',null,novo);
+      showToast('Próximo lembrete da série criado para '+fd(novaData));
+    }
     renderLembretes(); renderDashboard();
   } catch(e){showToast('Erro.','err');}
 }
@@ -2663,6 +2716,40 @@ function exportarExcel() {
   }
 }
 
+// ══ BACKUP AUTOMÁTICO (a cada 3h, enquanto o app estiver aberto) ══
+const BACKUP_AUTO_INTERVAL_MS = 3*60*60*1000; // 3 horas
+async function backupAutomatico() {
+  try {
+    const payload = {
+      criadoEm: new Date().toISOString(),
+      criadoEmServer: firebase.firestore.FieldValue.serverTimestamp(),
+      receitas: cache.receitas, despesas: cache.despesas, contas: cache.contas,
+      investimentos: cache.investimentos, orcamentos: cache.orcamentos, metas: cache.metas,
+      lembretes: cache.lembretes||[]
+    };
+    await db.collection('backups_bev').add(payload);
+    // Mantém só os 20 backups automáticos mais recentes, para não crescer indefinidamente
+    const snap = await db.collection('backups_bev').orderBy('criadoEmServer','desc').get();
+    if(snap.docs.length>20) {
+      for(const d of snap.docs.slice(20)) await d.ref.delete();
+    }
+    const st=document.getElementById('backup-status');
+    if(st) st.textContent='✅ Backup automático salvo em '+new Date().toLocaleString('pt-BR')+' · próximo em até 3h (enquanto o app estiver aberto)';
+  } catch(e) { console.error('Erro no backup automático', e); }
+}
+async function iniciarBackupAutomatico() {
+  try {
+    const snap = await db.collection('backups_bev').orderBy('criadoEmServer','desc').limit(1).get();
+    let deveRodarAgora=true;
+    if(!snap.empty) {
+      const ultimo=snap.docs[0].data();
+      const ts=ultimo.criadoEmServer && ultimo.criadoEmServer.toDate ? ultimo.criadoEmServer.toDate() : new Date(ultimo.criadoEm);
+      deveRodarAgora=(Date.now()-ts.getTime())>=BACKUP_AUTO_INTERVAL_MS;
+    }
+    if(deveRodarAgora) await backupAutomatico();
+  } catch(e) { console.error('Erro ao verificar backup automático', e); }
+  setInterval(backupAutomatico, BACKUP_AUTO_INTERVAL_MS);
+}
 function exportarJSON() {
   const payload = {
     data: new Date().toISOString(),
