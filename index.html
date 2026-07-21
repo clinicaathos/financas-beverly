@@ -438,10 +438,6 @@ body.dark .card,.dark .kpi,.dark .fin-stat,.dark .ind,.dark .conta-card,.dark .m
             <div id="d-lembretes"></div>
           </div>
         </div>
-        <div class="card" style="margin-top:1rem">
-          <div class="card-title">Orçamento do Mês <button class="btn btn-ghost btn-sm" onclick="goPage('orcamento',null)">Gerenciar</button></div>
-          <div id="d-orc"></div>
-        </div>
       </div>
 
       <!-- LANÇAMENTOS -->
@@ -510,9 +506,10 @@ body.dark .card,.dark .kpi,.dark .fin-stat,.dark .ind,.dark .conta-card,.dark .m
             <div class="search-wrap"><span class="search-icon">🔍</span><input class="search-input" placeholder="Buscar na movimentação..." oninput="buscarMov(this.value)" id="mov-search"></div>
             <div style="display:flex;gap:.5rem;margin-bottom:.875rem;flex-wrap:wrap;align-items:center">
               <label class="form-label" style="margin:0;white-space:nowrap">De:</label>
-              <input type="date" class="form-input" id="mov-ini" style="width:auto;flex:1;min-width:130px" onchange="filtrarMovData()">
+              <input type="date" class="form-input" id="mov-ini" style="width:auto;flex:1;min-width:130px">
               <label class="form-label" style="margin:0;white-space:nowrap">Até:</label>
-              <input type="date" class="form-input" id="mov-fim" style="width:auto;flex:1;min-width:130px" onchange="filtrarMovData()">
+              <input type="date" class="form-input" id="mov-fim" style="width:auto;flex:1;min-width:130px">
+              <button class="btn btn-gold btn-sm" onclick="filtrarMovData()">🔍 Pesquisar</button>
               <button class="btn btn-ghost btn-sm" onclick="limparFiltrosMov()">Limpar</button>
             </div>
             <div class="table-desktop" id="mov-table"></div>
@@ -812,6 +809,18 @@ body.dark .card,.dark .kpi,.dark .fin-stat,.dark .ind,.dark .conta-card,.dark .m
       <button class="btn btn-danger btn-sm" id="d-del-btn" style="display:none" onclick="delDesp()">Excluir</button>
       <button class="btn btn-ghost" onclick="closeModal('desp')">Cancelar</button>
       <button class="btn btn-gold" onclick="saveDesp()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-confirm-serie" onclick="closeMBg(event,'confirm-serie')">
+  <div class="modal-box modal-sm">
+    <div class="modal-title">Excluir lançamento recorrente</div>
+    <div style="font-size:.85rem;color:var(--text-2);margin-bottom:1.25rem" id="confirm-serie-msg">Este lançamento faz parte de uma recorrência. O que você deseja fazer?</div>
+    <div class="modal-footer" style="flex-wrap:wrap;justify-content:flex-end">
+      <button class="btn btn-ghost" onclick="closeModal('confirm-serie')">Cancelar</button>
+      <button class="btn btn-ghost" style="border-color:var(--red);color:var(--red)" onclick="confirmarExclusaoUnica()">Excluir apenas este lançamento</button>
+      <button class="btn btn-danger" onclick="confirmarExclusaoSerie()">Excluir toda a recorrência</button>
     </div>
   </div>
 </div>
@@ -1141,6 +1150,7 @@ function openModal(id) {
   if(id==='rec') { const r=document.getElementById('r-rep'); if(r){r.value='';} document.getElementById('r-rep-fim-grp').style.display='none'; document.getElementById('r-rep-fim').value=''; }
   if(id==='desp') { const d=document.getElementById('d-rep'); if(d){d.value='';} document.getElementById('d-rep-fim-grp').style.display='none'; document.getElementById('d-rep-fim').value=''; document.getElementById('d-parc-grp').style.display='none'; document.getElementById('d-parc').value=''; }
   if(id==='inv') { document.getElementById('inv-validade').value=''; }
+  if(id==='lembrete') { const l=document.getElementById('lem-rep'); if(l){l.value='';} document.getElementById('lem-rep-qtd-grp').style.display='none'; document.getElementById('lem-rep-qtd').value=''; }
   el.classList.add('open');
 }
 function closeModal(id) { document.getElementById('modal-'+id)?.classList.remove('open'); }
@@ -1321,23 +1331,6 @@ function renderDashboard() {
     </div>`;
   }).join('') : '<div style="font-size:.8rem;color:var(--text-3);text-align:center;padding:.5rem">Nenhuma meta ativa.</div>';
 
-  // Orçamento resumo
-  const alertaOrc = parseInt(document.getElementById('cfg-alerta-orc')?.value)||80;
-  const doc = document.getElementById('d-orc');
-  if(doc) doc.innerHTML = cache.orcamentos.length ? cache.orcamentos.slice(0,4).map(o=>{
-    const limite=pm(o.limite)||0;
-    const gasto=despMes.filter(d=>d.subcat===o.nome||d.subcat===o.subcat).reduce((s,d)=>s+pm(d.val),0);
-    const pct=limite>0?Math.min(100,Math.round(gasto/limite*100)):0;
-    const cls=pct>=100?'over':pct>=alertaOrc?'warn':'ok';
-    return `<div style="padding:.4rem 0;border-bottom:1px solid var(--border)">
-      <div style="display:flex;justify-content:space-between;font-size:.8rem;margin-bottom:3px">
-        <span>${o.nome}</span>
-        <span style="font-size:.72rem;color:${cls==='over'?'var(--red)':cls==='warn'?'var(--yellow)':'var(--text-3)'}">${fm(gasto)} / ${fm(limite)}</span>
-      </div>
-      <div class="orc-bar"><div class="orc-fill ${cls}" style="width:${pct}%"></div></div>
-    </div>`;
-  }).join('') : '<div style="font-size:.8rem;color:var(--text-3);text-align:center;padding:.5rem">Nenhum orçamento.</div>';
-
   // Sticky
   const sr=document.getElementById('sticky-rec'); if(sr) sr.textContent=fm(totalRec);
   const sd=document.getElementById('sticky-desp'); if(sd) sd.textContent=fm(totalDesp);
@@ -1363,9 +1356,8 @@ function renderLancamentos() {
   const ss=document.getElementById('sticky-saldo');if(ss){ss.textContent=fm(saldo);ss.style.color=saldo>=0?'var(--green)':'var(--red)';}
   // recCache = TODAS as pendentes (qualquer mês) — A Receber mostra futuras também
   recCache=cache.receitas.filter(r=>r.status!=='Pago');
-  // A Pagar: pendentes do mês atual + qualquer pendente vencida de meses anteriores (some só quando for paga)
-  const hojeStrLanc=today();
-  despCache=cache.despesas.filter(d=>d.status!=='Pago' && (isMesAtual(d.venc) || (d.venc && d.venc<hojeStrLanc)));
+  // A Pagar: agora segue o mesmo comportamento — todas as pendentes, independente do mês
+  despCache=cache.despesas.filter(d=>d.status!=='Pago');
   renderRecTable(recCache);
   renderDespTable(despCache);
   renderProjecao();
@@ -1495,7 +1487,7 @@ async function devolverLancamento(id,tipo) {
     await db.collection(colBev).doc(id).update(updateData);
     const item=cache[colecao].find(x=>x.id===id);
     if(item){item.status='Pendente';item.dataPagamento='';}
-    renderMovTable(); renderLancamentos(); renderDashboard();
+    renderMovTable(); refreshListasPagarReceber(); renderDashboard();
     showToast('Lançamento devolvido para pendente.');
   } catch(e){showToast('Erro ao devolver.','err');}
 }
@@ -1527,17 +1519,17 @@ function renderProjecao() {
   const pc=document.getElementById('proj-cards');
   if(pc)pc.innerHTML=`
     <div class="fin-stat">
-      <div class="fin-stat-label">Receita Prevista — ${proxMesNome}</div>
+      <div class="fin-stat-label">Total previsto a receber — ${proxMesNome}</div>
       <div class="fin-stat-val" style="color:var(--green)">${fm(tRec)}</div>
       <div style="font-size:.68rem;color:var(--text-3);margin-top:3px">${recPrev.length} lançamento(s)</div>
     </div>
     <div class="fin-stat">
-      <div class="fin-stat-label">Despesas Previstas — ${proxMesNome}</div>
+      <div class="fin-stat-label">Total previsto a pagar — ${proxMesNome}</div>
       <div class="fin-stat-val" style="color:var(--red)">${fm(tDesp)}</div>
       <div style="font-size:.68rem;color:var(--text-3);margin-top:3px">${despPrev.length} lançamento(s)</div>
     </div>
     <div class="fin-stat">
-      <div class="fin-stat-label">Saldo Projetado</div>
+      <div class="fin-stat-label">Saldo previsto (Receber - Pagar)</div>
       <div class="fin-stat-val" style="color:${saldo>=0?'var(--green)':'var(--red)'}">${fm(saldo)}</div>
       <div style="font-size:.68rem;color:var(--text-3);margin-top:3px">${saldo>=0?'superávit':'déficit'}</div>
     </div>`;
@@ -1577,20 +1569,55 @@ function renderProjecao() {
 // ══ FILTROS ══
 function filtrarRec(tipo,el) {
   document.querySelectorAll('#tab-a-rec .qf-btn').forEach(b=>b.classList.remove('active')); el.classList.add('active');
-  const h=today();
-  // recCache já contém todas as pendentes
-  let f=[...recCache];
-  if(tipo==='vencido') f=f.filter(r=>r.venc&&r.venc<h);
-  renderRecTable(f);
+  renderRecTable(aplicarFiltroRec(tipo));
 }
 function filtrarDesp(tipo,el) {
   document.querySelectorAll('#tab-a-pagar .qf-btn').forEach(b=>b.classList.remove('active')); el.classList.add('active');
+  renderDespTable(aplicarFiltroDesp(tipo));
+}
+// Calcula a lista filtrada a partir de um tipo de quick-filter, sem mexer na UI —
+// usado tanto pelo clique direto no botão quanto para reaplicar o filtro após uma ação.
+function aplicarFiltroRec(tipo) {
   const h=today();
-  // Base: mês atual + qualquer pendente vencida de meses anteriores (some da lista só quando paga)
-  let f=cache.despesas.filter(d=>d.status!=='Pago' && (isMesAtual(d.venc) || (d.venc && d.venc<h)));
-  if(tipo==='pendente')f=f.filter(d=>d.status!=='Pago');
-  else if(tipo==='vencido')f=cache.despesas.filter(d=>d.status!=='Pago'&&d.venc&&d.venc<h);
-  renderDespTable(f);
+  if(tipo==='pago') return cache.receitas.filter(r=>r.status==='Pago');
+  let f=[...recCache];
+  if(tipo==='vencido') f=f.filter(r=>r.venc&&r.venc<h);
+  return f;
+}
+function aplicarFiltroDesp(tipo) {
+  const h=today();
+  if(tipo==='vencido') return cache.despesas.filter(d=>d.status!=='Pago'&&d.venc&&d.venc<h);
+  if(tipo==='mes') return despCache.filter(d=>isMesAtual(d.venc));
+  return [...despCache];
+}
+function getFiltroAtivo(seletor) {
+  const btn=document.querySelector(seletor+' .qf-btn.active');
+  if(!btn) return 'todos';
+  const m=btn.getAttribute('onclick')?.match(/filtrar(?:Rec|Desp)\('(\w+)'/);
+  return m?m[1]:'todos';
+}
+// Reaplica o quick-filter e/ou os filtros de período/categoria atualmente ativos na tela,
+// sem resetar a visualização — usado após excluir, editar ou dar baixa em um lançamento.
+function reaplicarFiltroRec() {
+  renderRecTable(aplicarFiltroRec(getFiltroAtivo('#tab-a-rec')));
+}
+function reaplicarFiltroDesp() {
+  const ini=document.getElementById('pagar-ini')?.value||'';
+  const fim=document.getElementById('pagar-fim')?.value||'';
+  const cat=document.getElementById('pagar-cat')?.value||'';
+  const subcat=document.getElementById('pagar-subcat')?.value||'';
+  if(ini||fim||cat||subcat) { renderDespTable(filtrarDespDataBase()); return; }
+  renderDespTable(aplicarFiltroDesp(getFiltroAtivo('#tab-a-pagar')));
+}
+// Recalcula os caches de A Receber/A Pagar e redesenha as duas listas mantendo
+// o filtro (quick-filter, período, categoria) e a aba em que o usuário estava.
+function refreshListasPagarReceber() {
+  recCache=cache.receitas.filter(r=>r.status!=='Pago');
+  despCache=cache.despesas.filter(d=>d.status!=='Pago');
+  reaplicarFiltroRec();
+  reaplicarFiltroDesp();
+  atualizarTotaisLancamentos();
+  renderProjecao();
 }
 // Recalcula apenas os totais/KPIs do mês (cards do topo + sticky), sem reconstruir as tabelas.
 // Usado após dar baixa, para o usuário permanecer na mesma lista sem o lançamento sumir da tela.
@@ -1648,15 +1675,14 @@ function atualizarBadgeDesp(id, novoStatus) {
     });
   }
 }
-function buscarRec(q){renderRecTable(q?cache.receitas.filter(r=>r.desc?.toLowerCase().includes(q.toLowerCase())):cache.receitas.filter(r=>isMesAtual(r.venc)));}
+function buscarRec(q){renderRecTable(q?cache.receitas.filter(r=>r.desc?.toLowerCase().includes(q.toLowerCase())):recCache);}
 function buscarDesp(q){renderDespTable(q?cache.despesas.filter(d=>d.desc?.toLowerCase().includes(q.toLowerCase())):filtrarDespDataBase());}
 function filtrarDespDataBase() {
   const ini=document.getElementById('pagar-ini')?.value||'';
   const fim=document.getElementById('pagar-fim')?.value||'';
   const cat=document.getElementById('pagar-cat')?.value||'';
   const subcat=document.getElementById('pagar-subcat')?.value||'';
-  let f=cache.despesas;
-  if(!ini&&!fim&&!cat&&!subcat) f=f.filter(d=>isMesAtual(d.venc));
+  let f=cache.despesas.filter(d=>d.status!=='Pago');
   if(ini) f=f.filter(d=>d.venc&&d.venc>=ini);
   if(fim) f=f.filter(d=>d.venc&&d.venc<=fim);
   if(cat) f=f.filter(d=>d.cat===cat);
@@ -1671,7 +1697,7 @@ function limparFiltrosPagar(){
   const ids=['pagar-ini','pagar-fim','pagar-cat','pagar-subcat'];
   ids.forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   document.querySelector('#tab-a-pagar .qf-btn')?.classList.add('active');
-  renderDespTable(cache.despesas.filter(d=>isMesAtual(d.venc)));
+  renderDespTable(despCache);
 }
 
 // ══ TABS ══
@@ -1702,9 +1728,10 @@ async function toggleRec(id) {
   try { await db.collection('receitas_bev').doc(id).update(updateData); }
   catch(e) { showToast('Erro ao atualizar.','err'); return; }
   // Após a baixa, o lançamento sai de "A Receber" (que mostra só pendentes) e passa
-  // a constar em Movimentações. Refiltra recCache e re-renderiza para refletir isso.
+  // a constar em Movimentações. Refiltra recCache e reaplica o filtro/período que
+  // estava ativo, para o usuário não perder a visualização em que estava trabalhando.
   recCache=cache.receitas.filter(x=>x.status!=='Pago');
-  renderRecTable(recCache);
+  reaplicarFiltroRec();
   atualizarTotaisLancamentos();
   renderDashboard();
   if(novoStatus==='Pago') {
@@ -1724,9 +1751,10 @@ async function toggleDesp(id) {
   try { await db.collection('despesas_bev').doc(id).update(updateData); }
   catch(e) { showToast('Erro ao atualizar.','err'); return; }
   // Após a baixa, o lançamento sai de "A Pagar" (que mostra só pendentes) e passa
-  // a constar em Movimentações. Refiltra a partir do mês atual e re-renderiza.
-  const idxDesp=despCache.findIndex(x=>x.id===id); if(idxDesp>=0) despCache[idxDesp]=d;
-  renderDespTable(despCache.filter(x=>x.status!=='Pago'));
+  // a constar em Movimentações. Refiltra despCache e reaplica o filtro/período que
+  // estava ativo, para o usuário permanecer na mesma visualização.
+  despCache=cache.despesas.filter(x=>x.status!=='Pago');
+  reaplicarFiltroDesp();
   atualizarTotaisLancamentos();
   renderDashboard();
   if(novoStatus==='Pago') {
@@ -1788,9 +1816,11 @@ async function saveRec() {
   const data={desc,cat:document.getElementById('r-cat').value,subcat:document.getElementById('r-subcat').value||'',val,venc,obs:document.getElementById('r-obs').value||'',rep:rep||'',mes:venc?new Date(venc+'T12:00:00').getMonth():mesAtual(),ano:venc?new Date(venc+'T12:00:00').getFullYear():anoAtual()};
   if(!editId) data.status='Pendente';
   try {
-    await saveDoc('receitas', editId||null, data);
-    // Gerar lançamentos futuros de repetição (apenas em novo)
+    const firstId = await saveDoc('receitas', editId||null, data);
+    // Gerar lançamentos futuros de repetição (apenas em novo) — todos ligados pela mesma serieId
     if(!editId && rep && venc) {
+      const serieId='ser_'+Date.now()+'_'+Math.random().toString(36).slice(2,7);
+      if(firstId) await saveDoc('receitas', firstId, {serieId});
       const qtd=parseInt(repQtd)||1;
       let datas=[];
       if(rep==='personalizado'){
@@ -1801,13 +1831,13 @@ async function saveRec() {
         datas=gerarDatasRepQtd(venc,rep,qtd);
       }
       for(const d of datas) {
-        const clone={...data,venc:d,status:'Pendente',rep:rep,mes:new Date(d+'T12:00:00').getMonth(),ano:new Date(d+'T12:00:00').getFullYear()};
+        const clone={...data,venc:d,status:'Pendente',rep:rep,serieId,mes:new Date(d+'T12:00:00').getMonth(),ano:new Date(d+'T12:00:00').getFullYear()};
         await saveDoc('receitas',null,clone);
       }
     }
     closeModal('rec'); showToast(editId?'Receita atualizada!':'Receita lançada!');
     await loadCollection('receitas');
-    renderLancamentos(); renderDashboard();
+    refreshListasPagarReceber(); renderDashboard();
   } catch(e) { showToast('Erro ao salvar.','err'); console.error(e); }
 }
 function editRec(id) {
@@ -1828,14 +1858,11 @@ function editRec(id) {
 }
 async function delRec() {
   const id=document.getElementById('rec-edit-id').value;
-  if(!id||!confirm('Excluir esta receita?')) return;
-  try { await deleteDoc('receitas',id); closeModal('rec'); showToast('Receita excluída.'); renderLancamentos(); renderDashboard(); }
-  catch(e){ showToast('Erro.','err'); }
+  if(!id) return;
+  iniciarExclusao('receitas', id, 'rec');
 }
-async function quickDelRec(id) {
-  if(!confirm('Excluir?')) return;
-  try { await deleteDoc('receitas',id); renderLancamentos(); renderDashboard(); }
-  catch(e){ showToast('Erro.','err'); }
+function quickDelRec(id) {
+  iniciarExclusao('receitas', id, null);
 }
 
 // ══ DESPESAS CRUD ══
@@ -1902,7 +1929,7 @@ async function saveDesp() {
       closeModal('desp'); showToast('Despesa lançada!');
     }
     await loadCollection('despesas');
-    renderLancamentos(); renderDashboard();
+    refreshListasPagarReceber(); renderDashboard();
   } catch(e) { showToast('Erro ao salvar.','err'); console.error(e); }
 }
 function editDesp(id) {
@@ -1922,14 +1949,51 @@ function editDesp(id) {
 }
 async function delDesp() {
   const id=document.getElementById('desp-edit-id').value;
-  if(!id||!confirm('Excluir?')) return;
-  try { await deleteDoc('despesas',id); closeModal('desp'); showToast('Despesa excluída.'); renderLancamentos(); renderDashboard(); }
-  catch(e){ showToast('Erro.','err'); }
+  if(!id) return;
+  iniciarExclusao('despesas', id, 'desp');
 }
-async function quickDelDesp(id) {
-  if(!confirm('Excluir?')) return;
-  try { await deleteDoc('despesas',id); renderLancamentos(); renderDashboard(); }
-  catch(e){ showToast('Erro.','err'); }
+function quickDelDesp(id) {
+  iniciarExclusao('despesas', id, null);
+}
+
+// ══ EXCLUSÃO DE LANÇAMENTOS (com tratamento de recorrência) ══
+let _delCtx=null;
+function iniciarExclusao(colecao, id, fromModalId) {
+  const item=cache[colecao].find(x=>x.id===id);
+  if(!item) return;
+  if(item.serieId) {
+    _delCtx={colecao,id,fromModalId};
+    const msg=document.getElementById('confirm-serie-msg');
+    if(msg) msg.textContent=`Este ${colecao==='receitas'?'lançamento de receita':'lançamento de despesa'} faz parte de uma recorrência. O que você deseja fazer?`;
+    document.getElementById('modal-confirm-serie')?.classList.add('open');
+  } else {
+    if(!confirm('Excluir este lançamento?')) return;
+    executarExclusao(colecao, id, 'unica', fromModalId);
+  }
+}
+function confirmarExclusaoUnica() {
+  if(_delCtx) executarExclusao(_delCtx.colecao, _delCtx.id, 'unica', _delCtx.fromModalId);
+}
+function confirmarExclusaoSerie() {
+  if(_delCtx) executarExclusao(_delCtx.colecao, _delCtx.id, 'serie', _delCtx.fromModalId);
+}
+async function executarExclusao(colecao, id, escopo, fromModalId) {
+  try {
+    if(escopo==='serie') {
+      const item=cache[colecao].find(x=>x.id===id);
+      const serieId=item?.serieId;
+      const relacionados=serieId?cache[colecao].filter(x=>x.serieId===serieId):(item?[item]:[]);
+      for(const r of relacionados) await deleteDoc(colecao, r.id);
+      showToast('Recorrência excluída.');
+    } else {
+      await deleteDoc(colecao, id);
+      showToast(colecao==='receitas'?'Receita excluída.':'Despesa excluída.');
+    }
+    closeModal('confirm-serie');
+    if(fromModalId) closeModal(fromModalId);
+    refreshListasPagarReceber();
+    renderDashboard();
+  } catch(e) { showToast('Erro ao excluir.','err'); }
 }
 
 // ══ METAS ══
@@ -2539,12 +2603,16 @@ function gerarFiltrado() {
       </div>
     </div>
     <div class="form-group"><label class="form-label">Repetição</label>
-      <select class="form-select" id="lem-rep">
+      <select class="form-select" id="lem-rep" onchange="toggleRepLembrete()">
         <option value="">Sem repetição</option>
         <option value="quinzenal">Quinzenal</option>
         <option value="mensal">Mensal (todo mês, no mesmo dia)</option>
       </select>
       <div style="font-size:.68rem;color:var(--text-3);margin-top:.3rem">Ao concluir um lembrete recorrente, o próximo já é criado automaticamente.</div>
+    </div>
+    <div class="form-group" id="lem-rep-qtd-grp" style="display:none">
+      <label class="form-label">Quantidade de repetições</label>
+      <input class="form-input" type="number" id="lem-rep-qtd" min="1" max="999" placeholder="Deixe em branco para repetir indefinidamente">
     </div>
     <div class="form-group"><label class="form-label">Status</label>
       <select class="form-select" id="lem-status">
@@ -2576,22 +2644,23 @@ function renderLembretes() {
   if(fPr) list=list.filter(l=>l.prior===fPr);
   if(fIni) list=list.filter(l=>l.venc&&l.venc>=fIni);
   if(fFim) list=list.filter(l=>l.venc&&l.venc<=fFim);
-  list.sort((a,b)=>{
+  if(!list.length){el.innerHTML='<div style="padding:2rem;text-align:center;font-size:.82rem;color:var(--text-3)">Nenhum lembrete encontrado.</div>';return;}
+  const ordenar=arr=>arr.sort((a,b)=>{
     const p={Alta:0,Média:1,Baixa:2};
     const pDiff=(p[a.prior]||1)-(p[b.prior]||1);
     if(pDiff!==0)return pDiff;
     return (a.venc||'').localeCompare(b.venc||'');
   });
-  if(!list.length){el.innerHTML='<div style="padding:2rem;text-align:center;font-size:.82rem;color:var(--text-3)">Nenhum lembrete encontrado.</div>';return;}
   const priorCor={Alta:'var(--red)',Média:'var(--yellow)',Baixa:'var(--green)'};
   const priorBg={Alta:'var(--red-bg)',Média:'var(--yellow-bg)',Baixa:'var(--green-bg)'};
-  el.innerHTML=list.map(l=>{
+  function cardHtml(l) {
     const vencido=l.status==='Pendente'&&l.venc&&l.venc<h;
     const dias=l.venc?Math.ceil((new Date(l.venc+'T12:00:00')-new Date())/86400000):null;
     const vencLabel=dias===null?''
       :dias<0?`Venceu há ${Math.abs(dias)} dia(s)`
       :dias===0?'Vence hoje'
       :`Vence em ${dias} dia(s)`;
+    const repLabel=l.rep?`<span style="font-size:.62rem;font-weight:700;color:var(--gold);background:var(--gold-pale);border-radius:20px;padding:2px 8px">🔁 ${l.rep==='mensal'?'Mensal':'Quinzenal'}${l.repQtd?` · ${l.repN||1}/${l.repQtd}`:''}</span>`:'';
     return `<div class="card" style="margin-bottom:.625rem;border-left:3px solid ${priorCor[l.prior]||'var(--gold)'}${vencido?';background:var(--red-bg)':''}">
       <div style="display:flex;justify-content:space-between;align-items:flex-start">
         <div style="flex:1;min-width:0">
@@ -2600,6 +2669,7 @@ function renderLembretes() {
           <div style="display:flex;flex-wrap:wrap;gap:.375rem;align-items:center">
             <span style="font-size:.62rem;font-weight:700;color:${priorCor[l.prior]};background:${priorBg[l.prior]};border-radius:20px;padding:2px 8px">${l.prior}</span>
             <span class="badge ${l.status==='Concluído'?'bg-green':l.status==='Cancelado'?'bg-neutral':'bg-yellow'}" style="font-size:.62rem">${l.status}</span>
+            ${repLabel}
             ${l.venc?`<span style="font-size:.72rem;color:${vencido?'var(--red)':'var(--text-3)'}">${vencido?'⚠️ ':'📅 '}${vencLabel} (${fd(l.venc)})</span>`:''}
           </div>
         </div>
@@ -2609,7 +2679,24 @@ function renderLembretes() {
         </div>
       </div>
     </div>`;
-  }).join('');
+  }
+  const recorrentes=ordenar(list.filter(l=>l.rep));
+  const unicos=ordenar(list.filter(l=>!l.rep));
+  let html='';
+  if(recorrentes.length){
+    html+=`<div style="font-size:.72rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-3);margin:.25rem 0 .5rem">🔁 Recorrentes — ${recorrentes.length}</div>`;
+    html+=recorrentes.map(cardHtml).join('');
+  }
+  if(unicos.length){
+    html+=`<div style="font-size:.72rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-3);margin:${recorrentes.length?'1.25rem':'.25rem'} 0 .5rem">📌 Únicos — ${unicos.length}</div>`;
+    html+=unicos.map(cardHtml).join('');
+  }
+  el.innerHTML=html;
+}
+function toggleRepLembrete() {
+  const rep=document.getElementById('lem-rep').value;
+  const grp=document.getElementById('lem-rep-qtd-grp');
+  if(grp) grp.style.display=rep?'block':'none';
 }
 function proximaDataLembrete(venc,rep) {
   const cur=new Date(venc+'T12:00:00');
@@ -2622,8 +2709,12 @@ async function saveLembrete() {
   const titulo=document.getElementById('lem-titulo').value.trim();
   if(!titulo){showToast('Título obrigatório.','err');return;}
   const rep=document.getElementById('lem-rep').value;
+  const repQtd=document.getElementById('lem-rep-qtd')?.value||'';
   const data={titulo,desc:document.getElementById('lem-desc').value||'',venc:document.getElementById('lem-venc').value||'',prior:document.getElementById('lem-prior').value,status:document.getElementById('lem-status').value,rep:rep||'',criadoEm:editId?undefined:today()};
-  if(!editId) data.criadoEm=today();
+  if(!editId) {
+    data.criadoEm=today();
+    if(rep) { data.repQtd=repQtd?parseInt(repQtd):''; data.repN=1; }
+  }
   try {
     if(!editId && rep && data.venc) data.serieId='ser_'+Date.now()+'_'+Math.random().toString(36).slice(2,7);
     await saveDoc('lembretes',editId||null,data);
@@ -2643,6 +2734,8 @@ function editLembrete(id) {
   document.getElementById('lem-prior').value=l.prior||'Média';
   document.getElementById('lem-status').value=l.status||'Pendente';
   const lemRep=document.getElementById('lem-rep'); if(lemRep) lemRep.value=l.rep||'';
+  const lemRepQtd=document.getElementById('lem-rep-qtd'); if(lemRepQtd) lemRepQtd.value=l.repQtd||'';
+  toggleRepLembrete();
   document.getElementById('modal-lembrete').classList.add('open');
 }
 async function delLembrete() {
@@ -2658,11 +2751,18 @@ async function concluirLembrete(id) {
     l.status='Concluído';
     showToast('Lembrete concluído ✓');
     // Recorrência: se este lembrete se repete, cria automaticamente a próxima ocorrência
+    // como pendente — a menos que a quantidade de repetições definida já tenha se esgotado.
     if(l.rep && l.venc) {
-      const novaData=proximaDataLembrete(l.venc,l.rep);
-      const novo={titulo:l.titulo,desc:l.desc||'',venc:novaData,prior:l.prior||'Média',status:'Pendente',rep:l.rep,serieId:l.serieId||('ser_'+Date.now()+'_'+Math.random().toString(36).slice(2,7)),criadoEm:today()};
-      await saveDoc('lembretes',null,novo);
-      showToast('Próximo lembrete da série criado para '+fd(novaData));
+      const ocorrenciaAtual=l.repN||1;
+      const limite=l.repQtd?parseInt(l.repQtd):0;
+      if(!limite || ocorrenciaAtual<limite) {
+        const novaData=proximaDataLembrete(l.venc,l.rep);
+        const novo={titulo:l.titulo,desc:l.desc||'',venc:novaData,prior:l.prior||'Média',status:'Pendente',rep:l.rep,serieId:l.serieId||('ser_'+Date.now()+'_'+Math.random().toString(36).slice(2,7)),repQtd:l.repQtd||'',repN:ocorrenciaAtual+1,criadoEm:today()};
+        await saveDoc('lembretes',null,novo);
+        showToast(limite?`Próximo lembrete criado (${ocorrenciaAtual+1}/${limite}) para ${fd(novaData)}`:'Próximo lembrete da série criado para '+fd(novaData));
+      } else {
+        showToast('Série de lembretes concluída — não há mais repetições previstas.');
+      }
     }
     renderLembretes(); renderDashboard();
   } catch(e){showToast('Erro.','err');}
