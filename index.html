@@ -469,6 +469,12 @@ body.dark .card,.dark .kpi,.dark .fin-stat,.dark .ind,.dark .conta-card,.dark .m
               <button class="qf-btn" onclick="filtrarRec('vencido',this)">Vencidos</button>
             </div>
             <div class="search-wrap"><span class="search-icon">🔍</span><input class="search-input" placeholder="Buscar receita..." oninput="buscarRec(this.value)"></div>
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:.75rem;margin-bottom:.625rem;flex-wrap:wrap">
+              <label style="display:flex;align-items:center;gap:.4rem;font-size:.78rem;color:var(--text-2);cursor:pointer">
+                <input type="checkbox" id="rec-sel-all" onchange="toggleSelAllRec(this.checked)"> Selecionar todos
+              </label>
+              <button class="btn btn-danger btn-sm" id="rec-bulk-del-btn" style="display:none" onclick="excluirSelecionadosRec()">🗑️ Excluir selecionados (<span id="rec-sel-count">0</span>)</button>
+            </div>
             <div class="table-desktop" id="rec-table"></div>
             <div class="cards-mobile" id="rec-cards"></div>
           </div>
@@ -498,6 +504,12 @@ body.dark .card,.dark .kpi,.dark .fin-stat,.dark .ind,.dark .conta-card,.dark .m
               </div>
             </div>
             <div class="search-wrap"><span class="search-icon">🔍</span><input class="search-input" placeholder="Buscar despesa..." oninput="buscarDesp(this.value)"></div>
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:.75rem;margin-bottom:.625rem;flex-wrap:wrap">
+              <label style="display:flex;align-items:center;gap:.4rem;font-size:.78rem;color:var(--text-2);cursor:pointer">
+                <input type="checkbox" id="desp-sel-all" onchange="toggleSelAllDesp(this.checked)"> Selecionar todos
+              </label>
+              <button class="btn btn-danger btn-sm" id="desp-bulk-del-btn" style="display:none" onclick="excluirSelecionadosDesp()">🗑️ Excluir selecionados (<span id="desp-sel-count">0</span>)</button>
+            </div>
             <div class="table-desktop" id="desp-table"></div>
             <div class="cards-mobile" id="desp-cards"></div>
           </div>
@@ -798,7 +810,7 @@ body.dark .card,.dark .kpi,.dark .fin-stat,.dark .ind,.dark .conta-card,.dark .m
           <option value="parcelado">Parcelado</option>
         </select>
       </div>
-      <div class="form-group" id="d-rep-fim-grp" style="display:none"><label class="form-label">Repetir até</label><input class="form-input" type="date" id="d-rep-fim"></div>
+      <div class="form-group" id="d-rep-fim-grp" style="display:none"><label class="form-label">Quantas repetições</label><input class="form-input" type="number" id="d-rep-fim" min="1" max="999" placeholder="Ex: 12"></div>
     </div>
     <div class="form-group" id="d-parc-grp" style="display:none">
       <label class="form-label">Número de parcelas</label>
@@ -1363,16 +1375,21 @@ function renderLancamentos() {
   renderProjecao();
 }
 
+let _recListaAtual=[];
 function renderRecTable(list) {
   const sorted=[...list].sort((a,b)=>(a.venc||'').localeCompare(b.venc||''));
+  _recListaAtual=sorted;
   const t=document.getElementById('rec-table');
   const m=document.getElementById('rec-cards');
   if(!sorted.length){
     if(t)t.innerHTML='<div class="data-table"><div style="padding:1.25rem;font-size:.82rem;color:var(--text-3);text-align:center">Nenhuma receita.</div></div>';
-    if(m)m.innerHTML='';return;
+    if(m)m.innerHTML='';
+    atualizarBarraSelRec();
+    return;
   }
-  if(t)t.innerHTML=`<div class="data-table"><div class="dt-head" style="grid-template-columns:2fr 1fr 1fr 1fr 1fr 40px"><span>Descrição</span><span>Categoria</span><span>Vencimento</span><span>Valor</span><span>Status</span><span></span></div>`+
-    sorted.map(r=>`<div class="dt-row" style="grid-template-columns:2fr 1fr 1fr 1fr 1fr 40px">
+  if(t)t.innerHTML=`<div class="data-table"><div class="dt-head" style="grid-template-columns:32px 2fr 1fr 1fr 1fr 1fr 40px"><span></span><span>Descrição</span><span>Categoria</span><span>Vencimento</span><span>Valor</span><span>Status</span><span></span></div>`+
+    sorted.map(r=>`<div class="dt-row" style="grid-template-columns:32px 2fr 1fr 1fr 1fr 1fr 40px">
+      <span><input type="checkbox" data-sel-rec="${r.id}" ${selRecIds.has(r.id)?'checked':''} onchange="toggleSelRec('${r.id}',this.checked)"></span>
       <span style="font-weight:600;cursor:pointer;color:var(--gold)" onclick="editRec('${r.id}')">${r.desc||'—'}${r.subcat?` <span style="font-size:.65rem;color:var(--text-3)">· ${r.subcat}</span>`:''}</span>
       <span><span class="badge ${r.cat==='Fixa'?'bg-green':r.cat==='Variável'?'bg-blue':'bg-neutral'}">${r.cat}</span></span>
       <span style="color:var(--text-2)">${fd(r.venc)}</span>
@@ -1383,23 +1400,35 @@ function renderRecTable(list) {
   if(m)m.innerHTML=sorted.map(r=>`
     <div class="mob-card" data-id="${r.id}" data-tipo="rec" data-status="${r.status}">
       <div class="swipe-hint ${r.status==='Pago'?'warn':'ok'}">${r.status==='Pago'?'Pendente':'Recebido ✓'}</div>
-      <div class="mob-top"><div class="mob-name">${r.desc}</div><div class="mob-val" style="color:var(--green)">${fm(r.val)}</div></div>
+      <div class="mob-top">
+        <div style="display:flex;align-items:center;gap:.5rem;min-width:0">
+          <input type="checkbox" data-sel-rec="${r.id}" ${selRecIds.has(r.id)?'checked':''} onchange="toggleSelRec('${r.id}',this.checked)">
+          <div class="mob-name">${r.desc}</div>
+        </div>
+        <div class="mob-val" style="color:var(--green)">${fm(r.val)}</div>
+      </div>
       <div class="mob-meta"><span class="badge ${r.status==='Pago'?'bg-green':'bg-yellow'} status-pill" onclick="toggleRec('${r.id}')">${r.status==='Pago'?'Recebido':'Pendente'}</span><span>${r.cat}</span>${r.venc?`<span>📅 ${fd(r.venc)}</span>`:''}</div>
       <div class="mob-actions"><button class="btn btn-ghost btn-sm" onclick="editRec('${r.id}')">✏️</button><button class="del-btn" onclick="quickDelRec('${r.id}')">🗑️</button></div>
     </div>`).join('');
   initSwipe();
+  atualizarBarraSelRec();
 }
 
+let _despListaAtual=[];
 function renderDespTable(list) {
   const sorted=[...list].sort((a,b)=>(a.venc||'').localeCompare(b.venc||''));
+  _despListaAtual=sorted;
   const t=document.getElementById('desp-table');
   const m=document.getElementById('desp-cards');
   if(!sorted.length){
     if(t)t.innerHTML='<div class="data-table"><div style="padding:1.25rem;font-size:.82rem;color:var(--text-3);text-align:center">Nenhuma despesa.</div></div>';
-    if(m)m.innerHTML='';return;
+    if(m)m.innerHTML='';
+    atualizarBarraSelDesp();
+    return;
   }
-  if(t)t.innerHTML=`<div class="data-table"><div class="dt-head" style="grid-template-columns:2fr 1fr 1fr 1fr 1fr 40px"><span>Descrição</span><span>Categoria</span><span>Vencimento</span><span>Valor</span><span>Status</span><span></span></div>`+
-    sorted.map(d=>`<div class="dt-row" style="grid-template-columns:2fr 1fr 1fr 1fr 1fr 40px">
+  if(t)t.innerHTML=`<div class="data-table"><div class="dt-head" style="grid-template-columns:32px 2fr 1fr 1fr 1fr 1fr 40px"><span></span><span>Descrição</span><span>Categoria</span><span>Vencimento</span><span>Valor</span><span>Status</span><span></span></div>`+
+    sorted.map(d=>`<div class="dt-row" style="grid-template-columns:32px 2fr 1fr 1fr 1fr 1fr 40px">
+      <span><input type="checkbox" data-sel-desp="${d.id}" ${selDespIds.has(d.id)?'checked':''} onchange="toggleSelDesp('${d.id}',this.checked)"></span>
       <span style="font-weight:600;cursor:pointer;color:var(--gold)" onclick="editDesp('${d.id}')">${d.desc||'—'}${d.subcat?` <span style="font-size:.65rem;color:var(--text-3)">· ${d.subcat}</span>`:''}</span>
       <span><span class="badge ${d.cat==='Fixo'?'bg-neutral':d.cat==='Variável'?'bg-yellow':'bg-red'}">${d.cat}</span></span>
       <span style="color:var(--text-2)">${fd(d.venc)}</span>
@@ -1410,11 +1439,18 @@ function renderDespTable(list) {
   if(m)m.innerHTML=sorted.map(d=>`
     <div class="mob-card" data-id="${d.id}" data-tipo="desp" data-status="${d.status}">
       <div class="swipe-hint ${d.status==='Pago'?'warn':'ok'}">${d.status==='Pago'?'Pendente':'Pago ✓'}</div>
-      <div class="mob-top"><div class="mob-name">${d.desc}${d.subcat?` <span style="font-size:.65rem;color:var(--text-3)">· ${d.subcat}</span>`:''}</div><div class="mob-val" style="color:var(--red)">${fm(d.val)}</div></div>
+      <div class="mob-top">
+        <div style="display:flex;align-items:center;gap:.5rem;min-width:0">
+          <input type="checkbox" data-sel-desp="${d.id}" ${selDespIds.has(d.id)?'checked':''} onchange="toggleSelDesp('${d.id}',this.checked)">
+          <div class="mob-name">${d.desc}${d.subcat?` <span style="font-size:.65rem;color:var(--text-3)">· ${d.subcat}</span>`:''}</div>
+        </div>
+        <div class="mob-val" style="color:var(--red)">${fm(d.val)}</div>
+      </div>
       <div class="mob-meta"><span class="badge ${d.status==='Pago'?'bg-green':'bg-yellow'} status-pill" onclick="toggleDesp('${d.id}')">${d.status==='Pago'?'Pago':'Pendente'}</span><span class="badge ${d.cat==='Fixo'?'bg-neutral':d.cat==='Variável'?'bg-yellow':'bg-red'}">${d.cat}</span>${d.venc?`<span>📅 ${fd(d.venc)}</span>`:''}</div>
       <div class="mob-actions"><button class="btn btn-ghost btn-sm" onclick="editDesp('${d.id}')">✏️</button><button class="del-btn" onclick="quickDelDesp('${d.id}')">🗑️</button></div>
     </div>`).join('');
   initSwipe();
+  atualizarBarraSelDesp();
 }
 
 let movCacheList=[];
@@ -1500,18 +1536,39 @@ function renderProjecao() {
   const mesesN=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
   const proxMesNome=mesesN[proxMesIdx];
 
-  // Critério único, sem duplicidade:
-  // Lançamentos com venc no próximo mês já cadastrados no Firestore.
-  // Parcelas e recorrências são salvas como entradas individuais com venc próprio —
-  // basta filtrar por data.
+  // Critério base: lançamentos com venc no próximo mês já cadastrados no Firestore —
+  // isso já cobre parcelas e recorrências configuradas via "Repetição", pois cada
+  // ocorrência é salva como um documento individual com seu próprio venc.
   function isProxMes(venc){
     if(!venc) return false;
     const d=new Date(venc+'T12:00:00');
     return d.getMonth()===proxMesIdx&&d.getFullYear()===proxAno;
   }
 
-  const recPrev=cache.receitas.filter(r=>isProxMes(r.venc));
-  const despPrev=cache.despesas.filter(d=>isProxMes(d.venc));
+  let recPrev=cache.receitas.filter(r=>isProxMes(r.venc));
+  let despPrev=cache.despesas.filter(d=>isProxMes(d.venc));
+
+  // Itens de categoria Fixo/Fixa lançados apenas no mês atual (sem repetição configurada)
+  // também são projetados para o próximo mês, já que representam contas que se repetem
+  // todo mês mesmo quando o usuário não usa o campo de repetição — evita que aluguel,
+  // mensalidades e salário fiquem de fora da previsão só porque ainda não foram lançados.
+  const recFixasAtuais=cache.receitas.filter(r=>r.cat==='Fixa'&&isMesAtual(r.venc));
+  const despFixasAtuais=cache.despesas.filter(d=>d.cat==='Fixo'&&isMesAtual(d.venc));
+  recFixasAtuais.forEach(r=>{
+    const jaTem=recPrev.some(x=>x.desc===r.desc&&x.cat==='Fixa');
+    if(!jaTem){
+      const d=new Date((r.venc||today())+'T12:00:00'); d.setMonth(d.getMonth()+1);
+      recPrev.push({...r,id:r.id+'_proj',venc:d.toISOString().split('T')[0],_projetado:true});
+    }
+  });
+  despFixasAtuais.forEach(d0=>{
+    const jaTem=despPrev.some(x=>x.desc===d0.desc&&x.cat==='Fixo');
+    if(!jaTem){
+      const d=new Date((d0.venc||today())+'T12:00:00'); d.setMonth(d.getMonth()+1);
+      despPrev.push({...d0,id:d0.id+'_proj',venc:d.toISOString().split('T')[0],_projetado:true});
+    }
+  });
+
   const tRec=recPrev.reduce((s,r)=>s+pm(r.val),0);
   const tDesp=despPrev.reduce((s,d)=>s+pm(d.val),0);
   const saldo=tRec-tDesp;
@@ -1535,6 +1592,8 @@ function renderProjecao() {
     </div>`;
 
   function tipoBadge(x){
+    if(x._projetado)
+      return '<span style="font-size:.6rem;color:var(--text-2);background:#f3ede7;border-radius:3px;padding:1px 6px;margin-left:5px">Fixo (projetado)</span>';
     if(x.rep==='parcelado'||x.parcela)
       return '<span style="font-size:.6rem;color:var(--blue);background:var(--blue-bg);border-radius:3px;padding:1px 6px;margin-left:5px">Parcela</span>';
     if(x.rep&&x.rep!=='')
@@ -1954,6 +2013,58 @@ async function delDesp() {
 }
 function quickDelDesp(id) {
   iniciarExclusao('despesas', id, null);
+}
+
+// ══ SELEÇÃO EM LOTE (A Receber / A Pagar) ══
+let selRecIds=new Set();
+let selDespIds=new Set();
+function toggleSelRec(id,checked){ if(checked) selRecIds.add(id); else selRecIds.delete(id); atualizarBarraSelRec(); }
+function toggleSelDesp(id,checked){ if(checked) selDespIds.add(id); else selDespIds.delete(id); atualizarBarraSelDesp(); }
+function toggleSelAllRec(checked){
+  if(checked) _recListaAtual.forEach(r=>selRecIds.add(r.id)); else selRecIds.clear();
+  renderRecTable(_recListaAtual);
+}
+function toggleSelAllDesp(checked){
+  if(checked) _despListaAtual.forEach(d=>selDespIds.add(d.id)); else selDespIds.clear();
+  renderDespTable(_despListaAtual);
+}
+function atualizarBarraSelRec(){
+  const btn=document.getElementById('rec-bulk-del-btn');
+  const cnt=document.getElementById('rec-sel-count');
+  if(cnt) cnt.textContent=String(selRecIds.size);
+  if(btn) btn.style.display=selRecIds.size?'inline-flex':'none';
+  const all=document.getElementById('rec-sel-all');
+  if(all) all.checked = _recListaAtual.length>0 && _recListaAtual.every(r=>selRecIds.has(r.id));
+}
+function atualizarBarraSelDesp(){
+  const btn=document.getElementById('desp-bulk-del-btn');
+  const cnt=document.getElementById('desp-sel-count');
+  if(cnt) cnt.textContent=String(selDespIds.size);
+  if(btn) btn.style.display=selDespIds.size?'inline-flex':'none';
+  const all=document.getElementById('desp-sel-all');
+  if(all) all.checked = _despListaAtual.length>0 && _despListaAtual.every(d=>selDespIds.has(d.id));
+}
+async function excluirSelecionadosRec(){
+  if(!selRecIds.size) return;
+  if(!confirm(`Excluir ${selRecIds.size} lançamento(s) de receita selecionado(s)? Esta ação não pode ser desfeita.`)) return;
+  try {
+    for(const id of [...selRecIds]) await deleteDoc('receitas', id);
+    showToast(`${selRecIds.size} lançamento(s) excluído(s).`);
+    selRecIds.clear();
+    refreshListasPagarReceber();
+    renderDashboard();
+  } catch(e) { showToast('Erro ao excluir os selecionados.','err'); }
+}
+async function excluirSelecionadosDesp(){
+  if(!selDespIds.size) return;
+  if(!confirm(`Excluir ${selDespIds.size} lançamento(s) de despesa selecionado(s)? Esta ação não pode ser desfeita.`)) return;
+  try {
+    for(const id of [...selDespIds]) await deleteDoc('despesas', id);
+    showToast(`${selDespIds.size} lançamento(s) excluído(s).`);
+    selDespIds.clear();
+    refreshListasPagarReceber();
+    renderDashboard();
+  } catch(e) { showToast('Erro ao excluir os selecionados.','err'); }
 }
 
 // ══ EXCLUSÃO DE LANÇAMENTOS (com tratamento de recorrência) ══
@@ -2710,18 +2821,28 @@ async function saveLembrete() {
   if(!titulo){showToast('Título obrigatório.','err');return;}
   const rep=document.getElementById('lem-rep').value;
   const repQtd=document.getElementById('lem-rep-qtd')?.value||'';
-  const data={titulo,desc:document.getElementById('lem-desc').value||'',venc:document.getElementById('lem-venc').value||'',prior:document.getElementById('lem-prior').value,status:document.getElementById('lem-status').value,rep:rep||'',criadoEm:editId?undefined:today()};
+  // Importante: nunca atribuir "undefined" a um campo — o Firestore rejeita a escrita
+  // inteira quando algum valor do objeto é undefined (era isso que causava o erro ao editar).
+  const data={
+    titulo,
+    desc:document.getElementById('lem-desc').value||'',
+    venc:document.getElementById('lem-venc').value||'',
+    prior:document.getElementById('lem-prior').value,
+    status:document.getElementById('lem-status').value,
+    rep:rep||'',
+    repQtd:rep?(repQtd?parseInt(repQtd):''):''
+  };
   if(!editId) {
     data.criadoEm=today();
-    if(rep) { data.repQtd=repQtd?parseInt(repQtd):''; data.repN=1; }
+    data.repN=rep?1:'';
+    if(rep && data.venc) data.serieId='ser_'+Date.now()+'_'+Math.random().toString(36).slice(2,7);
   }
   try {
-    if(!editId && rep && data.venc) data.serieId='ser_'+Date.now()+'_'+Math.random().toString(36).slice(2,7);
     await saveDoc('lembretes',editId||null,data);
     closeModal('lembrete'); showToast(editId?'Lembrete atualizado!':'Lembrete criado!');
     await loadCollection('lembretes');
     renderLembretes(); renderDashboard();
-  } catch(e){showToast('Erro.','err');}
+  } catch(e){showToast('Erro ao salvar.','err'); console.error(e);}
 }
 function editLembrete(id) {
   const l=cache.lembretes.find(x=>x.id===id); if(!l) return;
