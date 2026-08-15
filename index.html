@@ -831,8 +831,21 @@ body.dark .card,.dark .kpi,.dark .fin-stat,.dark .ind,.dark .conta-card,.dark .m
     <div style="font-size:.85rem;color:var(--text-2);margin-bottom:1.25rem" id="confirm-serie-msg">Este lançamento faz parte de uma recorrência. O que você deseja fazer?</div>
     <div class="modal-footer" style="flex-wrap:wrap;justify-content:flex-end">
       <button class="btn btn-ghost" onclick="closeModal('confirm-serie')">Cancelar</button>
-      <button class="btn btn-ghost" style="border-color:var(--red);color:var(--red)" onclick="confirmarExclusaoUnica()">Excluir apenas este lançamento</button>
+      <button class="btn btn-ghost" style="border-color:var(--red);color:var(--red)" onclick="confirmarExclusaoUnica()">Somente este lançamento</button>
+      <button class="btn btn-ghost" style="border-color:var(--yellow);color:var(--yellow)" onclick="confirmarExclusaoFutura()">Encerrar a partir desta data</button>
       <button class="btn btn-danger" onclick="confirmarExclusaoSerie()">Excluir toda a recorrência</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-confirm-edit-serie" onclick="closeMBg(event,'confirm-edit-serie')">
+  <div class="modal-box modal-sm">
+    <div class="modal-title">Editar lançamento recorrente</div>
+    <div style="font-size:.85rem;color:var(--text-2);margin-bottom:1.25rem">Este lançamento faz parte de uma recorrência. Deseja aplicar esta alteração:</div>
+    <div class="modal-footer" style="flex-wrap:wrap;justify-content:flex-end">
+      <button class="btn btn-ghost" onclick="resolverEscopoEdicao(null)">Cancelar</button>
+      <button class="btn btn-ghost" onclick="resolverEscopoEdicao('unica')">Apenas neste lançamento</button>
+      <button class="btn btn-gold" onclick="resolverEscopoEdicao('futuras')">Em todos os lançamentos desta recorrência</button>
     </div>
   </div>
 </div>
@@ -961,6 +974,7 @@ body.dark .card,.dark .kpi,.dark .fin-stat,.dark .ind,.dark .conta-card,.dark .m
       </select>
     </div>
     <div class="form-group"><label class="form-label">Valor (R$)</label><input class="form-input" id="inv-mov-valor" placeholder="0,00" type="text"></div>
+    <div class="form-group"><label class="form-label">Data do aporte</label><input class="form-input" type="date" id="inv-mov-data"></div>
     <div class="form-group"><label class="form-label">Observações</label><textarea class="form-textarea" id="inv-mov-obs" placeholder="Descreva a movimentação..." style="min-height:60px"></textarea></div>
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="closeModal('inv-mov')">Cancelar</button>
@@ -1507,7 +1521,11 @@ function renderMovTable(lista) {
       </div>
     </div>`).join('');
 }
-function buscarMov(q){renderMovTable();}
+function debounce(fn, ms) {
+  let t;
+  return (...args) => { clearTimeout(t); t=setTimeout(()=>fn(...args), ms); };
+}
+const buscarMov=debounce(function(q){renderMovTable();}, 200);
 function filtrarMovData(){renderMovTable();}
 function limparFiltrosMov(){
   const ini=document.getElementById('mov-ini');const fim=document.getElementById('mov-fim');const s=document.getElementById('mov-search');
@@ -1734,8 +1752,8 @@ function atualizarBadgeDesp(id, novoStatus) {
     });
   }
 }
-function buscarRec(q){renderRecTable(q?cache.receitas.filter(r=>r.desc?.toLowerCase().includes(q.toLowerCase())):recCache);}
-function buscarDesp(q){renderDespTable(q?cache.despesas.filter(d=>d.desc?.toLowerCase().includes(q.toLowerCase())):filtrarDespDataBase());}
+const buscarRec=debounce(function(q){renderRecTable(q?cache.receitas.filter(r=>r.desc?.toLowerCase().includes(q.toLowerCase())):recCache);}, 200);
+const buscarDesp=debounce(function(q){renderDespTable(q?cache.despesas.filter(d=>d.desc?.toLowerCase().includes(q.toLowerCase())):filtrarDespDataBase());}, 200);
 function filtrarDespDataBase() {
   const ini=document.getElementById('pagar-ini')?.value||'';
   const fim=document.getElementById('pagar-fim')?.value||'';
@@ -1875,23 +1893,38 @@ async function saveRec() {
   const data={desc,cat:document.getElementById('r-cat').value,subcat:document.getElementById('r-subcat').value||'',val,venc,obs:document.getElementById('r-obs').value||'',rep:rep||'',mes:venc?new Date(venc+'T12:00:00').getMonth():mesAtual(),ano:venc?new Date(venc+'T12:00:00').getFullYear():anoAtual()};
   if(!editId) data.status='Pendente';
   try {
-    const firstId = await saveDoc('receitas', editId||null, data);
-    // Gerar lançamentos futuros de repetição (apenas em novo) — todos ligados pela mesma serieId
-    if(!editId && rep && venc) {
-      const serieId='ser_'+Date.now()+'_'+Math.random().toString(36).slice(2,7);
-      if(firstId) await saveDoc('receitas', firstId, {serieId});
-      const qtd=parseInt(repQtd)||1;
-      let datas=[];
-      if(rep==='personalizado'){
-        const diasInt=parseInt(document.getElementById('r-rep-custom-dias')?.value)||30;
-        let cur=new Date(venc+'T12:00:00');
-        for(let i=0;i<qtd;i++){cur=new Date(cur.getTime()+diasInt*86400000);datas.push(cur.toISOString().split('T')[0]);}
+    if(editId) {
+      const original=cache.receitas.find(x=>x.id===editId);
+      if(original && original.serieId) {
+        // Lançamento pertence a uma recorrência: perguntar o escopo da alteração
+        const escopo = await abrirConfirmEscopoEdicao();
+        if(escopo===null) return; // cancelado
+        if(escopo==='futuras') {
+          const camposComuns={desc:data.desc,cat:data.cat,subcat:data.subcat,val:data.val,obs:data.obs};
+          const futuras=cache.receitas.filter(x=>x.serieId===original.serieId && x.venc>=original.venc);
+          await Promise.all(futuras.map(f=>saveDoc('receitas', f.id, f.id===editId?{...camposComuns,venc,mes:data.mes,ano:data.ano,status:data.status||f.status}:camposComuns)));
+        } else {
+          await saveDoc('receitas', editId, data);
+        }
       } else {
-        datas=gerarDatasRepQtd(venc,rep,qtd);
+        await saveDoc('receitas', editId, data);
       }
-      for(const d of datas) {
-        const clone={...data,venc:d,status:'Pendente',rep:rep,serieId,mes:new Date(d+'T12:00:00').getMonth(),ano:new Date(d+'T12:00:00').getFullYear()};
-        await saveDoc('receitas',null,clone);
+    } else {
+      const firstId = await saveDoc('receitas', editId||null, data);
+      // Gerar lançamentos futuros de repetição (apenas em novo) — todos ligados pela mesma serieId
+      if(rep && venc) {
+        const serieId='ser_'+Date.now()+'_'+Math.random().toString(36).slice(2,7);
+        if(firstId) await saveDoc('receitas', firstId, {serieId});
+        const qtd=parseInt(repQtd)||1;
+        let datas=[];
+        if(rep==='personalizado'){
+          const diasInt=parseInt(document.getElementById('r-rep-custom-dias')?.value)||30;
+          let cur=new Date(venc+'T12:00:00');
+          for(let i=0;i<qtd;i++){cur=new Date(cur.getTime()+diasInt*86400000);datas.push(cur.toISOString().split('T')[0]);}
+        } else {
+          datas=gerarDatasRepQtd(venc,rep,qtd);
+        }
+        await Promise.all(datas.map(d=>saveDoc('receitas',null,{...data,venc:d,status:'Pendente',rep:rep,serieId,mes:new Date(d+'T12:00:00').getMonth(),ano:new Date(d+'T12:00:00').getFullYear()})));
       }
     }
     closeModal('rec'); showToast(editId?'Receita atualizada!':'Receita lançada!');
@@ -1946,36 +1979,35 @@ async function saveDesp() {
     if(!editId && rep==='parcelado' && parcN>=2 && venc) {
       // Parcelado: gera N parcelas, cada uma no mês seguinte, todas ligadas pela mesma serieId
       const serieId='ser_'+Date.now()+'_'+Math.random().toString(36).slice(2,7);
+      const clones=[];
       for(let i=0;i<parcN;i++) {
         const d=new Date(venc+'T12:00:00');
         d.setMonth(d.getMonth()+i);
         const dStr=d.toISOString().split('T')[0];
-        const clone={...data,desc:`${desc} - ${i+1}/${parcN}`,venc:dStr,status:'Pendente',rep:'parcelado',parcela:`${i+1}/${parcN}`,serieId,mes:d.getMonth(),ano:d.getFullYear()};
-        await saveDoc('despesas',null,clone);
+        clones.push({...data,desc:`${desc} - ${i+1}/${parcN}`,venc:dStr,status:'Pendente',rep:'parcelado',parcela:`${i+1}/${parcN}`,serieId,mes:d.getMonth(),ano:d.getFullYear()});
       }
+      await Promise.all(clones.map(clone=>saveDoc('despesas',null,clone)));
       closeModal('desp'); showToast(`${parcN} parcelas criadas!`);
     } else if(!editId && rep && rep!=='parcelado' && venc) {
       // Recorrência aberta: gera as ocorrências futuras ligadas pela mesma serieId
       const serieId='ser_'+Date.now()+'_'+Math.random().toString(36).slice(2,7);
-      await saveDoc('despesas', null, {...data, serieId});
       const qtd=parseInt(repFim)||1;
       const datas=gerarDatasRepQtd(venc,rep,qtd);
-      for(const d of datas) {
-        const clone={...data,venc:d,status:'Pendente',rep:rep,serieId,mes:new Date(d+'T12:00:00').getMonth(),ano:new Date(d+'T12:00:00').getFullYear()};
-        await saveDoc('despesas',null,clone);
-      }
+      await Promise.all([
+        saveDoc('despesas', null, {...data, serieId}),
+        ...datas.map(d=>saveDoc('despesas',null,{...data,venc:d,status:'Pendente',rep:rep,serieId,mes:new Date(d+'T12:00:00').getMonth(),ano:new Date(d+'T12:00:00').getFullYear()}))
+      ]);
       closeModal('desp'); showToast('Despesa lançada!');
     } else if(editId) {
       const original=cache.despesas.find(x=>x.id===editId);
       if(original && original.serieId) {
         // Lançamento pertence a uma recorrência: perguntar o escopo da alteração
-        const aplicarTodas=confirm('Esta despesa faz parte de uma recorrência.\n\nOK = aplicar a alteração a esta e a todas as ocorrências futuras (mesma descrição/categoria/valor).\nCancelar = alterar apenas esta ocorrência.');
-        if(aplicarTodas) {
+        const escopo = await abrirConfirmEscopoEdicao();
+        if(escopo===null) return; // cancelado
+        if(escopo==='futuras') {
           const camposComuns={desc:data.desc,cat:data.cat,subcat:data.subcat,val:data.val,obs:data.obs};
           const futuras=cache.despesas.filter(x=>x.serieId===original.serieId && x.venc>=original.venc);
-          for(const f of futuras) {
-            await saveDoc('despesas', f.id, f.id===editId?{...camposComuns,venc,mes:data.mes,ano:data.ano,status:data.status||f.status}:camposComuns);
-          }
+          await Promise.all(futuras.map(f=>saveDoc('despesas', f.id, f.id===editId?{...camposComuns,venc,mes:data.mes,ano:data.ano,status:data.status||f.status}:camposComuns)));
         } else {
           await saveDoc('despesas', editId, data);
         }
@@ -2048,7 +2080,7 @@ async function excluirSelecionadosRec(){
   if(!selRecIds.size) return;
   if(!confirm(`Excluir ${selRecIds.size} lançamento(s) de receita selecionado(s)? Esta ação não pode ser desfeita.`)) return;
   try {
-    for(const id of [...selRecIds]) await deleteDoc('receitas', id);
+    await Promise.all([...selRecIds].map(id=>deleteDoc('receitas', id)));
     showToast(`${selRecIds.size} lançamento(s) excluído(s).`);
     selRecIds.clear();
     refreshListasPagarReceber();
@@ -2059,7 +2091,7 @@ async function excluirSelecionadosDesp(){
   if(!selDespIds.size) return;
   if(!confirm(`Excluir ${selDespIds.size} lançamento(s) de despesa selecionado(s)? Esta ação não pode ser desfeita.`)) return;
   try {
-    for(const id of [...selDespIds]) await deleteDoc('despesas', id);
+    await Promise.all([...selDespIds].map(id=>deleteDoc('despesas', id)));
     showToast(`${selDespIds.size} lançamento(s) excluído(s).`);
     selDespIds.clear();
     refreshListasPagarReceber();
@@ -2085,17 +2117,27 @@ function iniciarExclusao(colecao, id, fromModalId) {
 function confirmarExclusaoUnica() {
   if(_delCtx) executarExclusao(_delCtx.colecao, _delCtx.id, 'unica', _delCtx.fromModalId);
 }
+function confirmarExclusaoFutura() {
+  if(_delCtx) executarExclusao(_delCtx.colecao, _delCtx.id, 'futura', _delCtx.fromModalId);
+}
 function confirmarExclusaoSerie() {
   if(_delCtx) executarExclusao(_delCtx.colecao, _delCtx.id, 'serie', _delCtx.fromModalId);
 }
 async function executarExclusao(colecao, id, escopo, fromModalId) {
   try {
+    const item=cache[colecao].find(x=>x.id===id);
     if(escopo==='serie') {
-      const item=cache[colecao].find(x=>x.id===id);
       const serieId=item?.serieId;
       const relacionados=serieId?cache[colecao].filter(x=>x.serieId===serieId):(item?[item]:[]);
-      for(const r of relacionados) await deleteDoc(colecao, r.id);
+      await Promise.all(relacionados.map(r=>deleteDoc(colecao, r.id)));
       showToast('Recorrência excluída.');
+    } else if(escopo==='futura') {
+      // Encerra a recorrência a partir desta data: remove esta ocorrência e todas as futuras da mesma série,
+      // preservando o histórico de ocorrências passadas já lançadas.
+      const serieId=item?.serieId;
+      const relacionados=serieId?cache[colecao].filter(x=>x.serieId===serieId && x.venc>=item.venc):(item?[item]:[]);
+      await Promise.all(relacionados.map(r=>deleteDoc(colecao, r.id)));
+      showToast('Recorrência encerrada a partir desta data.');
     } else {
       await deleteDoc(colecao, id);
       showToast(colecao==='receitas'?'Receita excluída.':'Despesa excluída.');
@@ -2105,6 +2147,19 @@ async function executarExclusao(colecao, id, escopo, fromModalId) {
     refreshListasPagarReceber();
     renderDashboard();
   } catch(e) { showToast('Erro ao excluir.','err'); }
+}
+
+// ══ EDIÇÃO DE LANÇAMENTOS RECORRENTES (escolha de alcance) ══
+let _editScopeResolve=null;
+function abrirConfirmEscopoEdicao() {
+  return new Promise(resolve=>{
+    _editScopeResolve=resolve;
+    document.getElementById('modal-confirm-edit-serie')?.classList.add('open');
+  });
+}
+function resolverEscopoEdicao(valor) {
+  document.getElementById('modal-confirm-edit-serie')?.classList.remove('open');
+  if(_editScopeResolve) { _editScopeResolve(valor); _editScopeResolve=null; }
 }
 
 // ══ METAS ══
@@ -2410,6 +2465,7 @@ function abrirMovInv(id, inst) {
   document.getElementById('inv-mov-valor').value = '';
   document.getElementById('inv-mov-obs').value = '';
   document.getElementById('inv-mov-tipo').value = 'aporte';
+  const dataEl=document.getElementById('inv-mov-data'); if(dataEl) dataEl.value = today();
   document.getElementById('modal-inv-mov').classList.add('open');
 }
 
@@ -2418,6 +2474,7 @@ async function confirmarMovInv() {
   const tipo = document.getElementById('inv-mov-tipo').value;
   const valor = pm(document.getElementById('inv-mov-valor').value);
   const obs = document.getElementById('inv-mov-obs').value.trim();
+  const dataMov = document.getElementById('inv-mov-data')?.value || today();
   if(!valor){showToast('Informe um valor.','err');return;}
   const inv = cache.investimentos.find(x=>x.id===id); if(!inv) return;
   const novoValor = tipo==='aporte' ? pm(inv.valor)+valor : Math.max(0, pm(inv.valor)-valor);
@@ -2428,7 +2485,7 @@ async function confirmarMovInv() {
     });
     await db.collection('investimentos_bev').doc(id).collection('historico').add({
       tipo, valor: String(valor), obs: obs||'',
-      data: today(), criadoEm: firebase.firestore.FieldValue.serverTimestamp()
+      data: dataMov, criadoEm: firebase.firestore.FieldValue.serverTimestamp()
     });
     inv.valor = String(novoValor.toFixed(2));
     closeModal('inv-mov');
@@ -2443,7 +2500,7 @@ async function verHistorico(id, inst) {
   listaEl.innerHTML = '<div style="font-size:.82rem;color:var(--text-3);text-align:center;padding:1rem">Carregando...</div>';
   document.getElementById('modal-inv-hist').classList.add('open');
   try {
-    const snap = await db.collection('investimentos_bev').doc(id).collection('historico').orderBy('criadoEm','desc').get();
+    const snap = await db.collection('investimentos_bev').doc(id).collection('historico').orderBy('data','desc').get();
     const items = snap.docs.map(d=>d.data());
     if(!items.length){listaEl.innerHTML='<div style="font-size:.82rem;color:var(--text-3);text-align:center;padding:1rem">Sem histórico registrado.</div>';return;}
     listaEl.innerHTML = items.map(h=>{
@@ -2716,6 +2773,7 @@ function gerarFiltrado() {
     <div class="form-group"><label class="form-label">Repetição</label>
       <select class="form-select" id="lem-rep" onchange="toggleRepLembrete()">
         <option value="">Sem repetição</option>
+        <option value="diario">Diário</option>
         <option value="quinzenal">Quinzenal</option>
         <option value="mensal">Mensal (todo mês, no mesmo dia)</option>
       </select>
@@ -2743,6 +2801,8 @@ function gerarFiltrado() {
 
 <script>
 // ══ LEMBRETES ══
+let _lemConcluidosAbertos=false;
+function toggleLembConcluidos() { _lemConcluidosAbertos=!_lemConcluidosAbertos; renderLembretes(); }
 function renderLembretes() {
   const el=document.getElementById('lem-list'); if(!el) return;
   const fSt=document.getElementById('lem-f-status')?.value||'';
@@ -2764,15 +2824,16 @@ function renderLembretes() {
   });
   const priorCor={Alta:'var(--red)',Média:'var(--yellow)',Baixa:'var(--green)'};
   const priorBg={Alta:'var(--red-bg)',Média:'var(--yellow-bg)',Baixa:'var(--green-bg)'};
-  function cardHtml(l) {
+  const repNomes={diario:'Diário',quinzenal:'Quinzenal',mensal:'Mensal'};
+  function cardHtml(l, concluido) {
     const vencido=l.status==='Pendente'&&l.venc&&l.venc<h;
     const dias=l.venc?Math.ceil((new Date(l.venc+'T12:00:00')-new Date())/86400000):null;
     const vencLabel=dias===null?''
       :dias<0?`Venceu há ${Math.abs(dias)} dia(s)`
       :dias===0?'Vence hoje'
       :`Vence em ${dias} dia(s)`;
-    const repLabel=l.rep?`<span style="font-size:.62rem;font-weight:700;color:var(--gold);background:var(--gold-pale);border-radius:20px;padding:2px 8px">🔁 ${l.rep==='mensal'?'Mensal':'Quinzenal'}${l.repQtd?` · ${l.repN||1}/${l.repQtd}`:''}</span>`:'';
-    return `<div class="card" style="margin-bottom:.625rem;border-left:3px solid ${priorCor[l.prior]||'var(--gold)'}${vencido?';background:var(--red-bg)':''}">
+    const repLabel=l.rep?`<span style="font-size:.62rem;font-weight:700;color:var(--gold);background:var(--gold-pale);border-radius:20px;padding:2px 8px">🔁 ${repNomes[l.rep]||l.rep}${l.repQtd?` · ${l.repN||1}/${l.repQtd}`:''}</span>`:'';
+    return `<div class="card" style="margin-bottom:.625rem;border-left:3px solid ${priorCor[l.prior]||'var(--gold)'}${vencido?';background:var(--red-bg)':''}${concluido?';opacity:.6':''}">
       <div style="display:flex;justify-content:space-between;align-items:flex-start">
         <div style="flex:1;min-width:0">
           <div style="font-size:.88rem;font-weight:700;margin-bottom:3px">${l.titulo||'—'}</div>
@@ -2787,20 +2848,20 @@ function renderLembretes() {
         <div style="display:flex;gap:.25rem;flex-shrink:0;margin-left:.75rem">
           ${l.status==='Pendente'?`<button class="btn btn-ghost btn-sm" style="color:var(--green);border-color:var(--green)" onclick="concluirLembrete('${l.id}')">✓</button>`:''}
           <button class="btn btn-ghost btn-sm" onclick="editLembrete('${l.id}')">✏️</button>
+          <button class="btn btn-ghost btn-sm" style="color:var(--red);border-color:var(--red)" onclick="quickDelLembrete('${l.id}')">🗑️</button>
         </div>
       </div>
     </div>`;
   }
-  const recorrentes=ordenar(list.filter(l=>l.rep));
-  const unicos=ordenar(list.filter(l=>!l.rep));
+  const pendentes=ordenar(list.filter(l=>l.status==='Pendente'));
+  const concluidos=ordenar(list.filter(l=>l.status!=='Pendente'));
   let html='';
-  if(recorrentes.length){
-    html+=`<div style="font-size:.72rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-3);margin:.25rem 0 .5rem">🔁 Recorrentes — ${recorrentes.length}</div>`;
-    html+=recorrentes.map(cardHtml).join('');
-  }
-  if(unicos.length){
-    html+=`<div style="font-size:.72rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-3);margin:${recorrentes.length?'1.25rem':'.25rem'} 0 .5rem">📌 Únicos — ${unicos.length}</div>`;
-    html+=unicos.map(cardHtml).join('');
+  html+=pendentes.length
+    ? pendentes.map(l=>cardHtml(l,false)).join('')
+    : '<div style="padding:1.25rem;text-align:center;font-size:.8rem;color:var(--text-3)">Nenhum lembrete pendente.</div>';
+  if(concluidos.length){
+    html+=`<div onclick="toggleLembConcluidos()" style="cursor:pointer;user-select:none;font-size:.72rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-3);margin:1.25rem 0 .5rem;display:flex;align-items:center;gap:.375rem">Concluídos ✓ (${concluidos.length}) <span>${_lemConcluidosAbertos?'▼':'▶️'}</span></div>`;
+    if(_lemConcluidosAbertos) html+=concluidos.map(l=>cardHtml(l,true)).join('');
   }
   el.innerHTML=html;
 }
@@ -2811,7 +2872,8 @@ function toggleRepLembrete() {
 }
 function proximaDataLembrete(venc,rep) {
   const cur=new Date(venc+'T12:00:00');
-  if(rep==='quinzenal') cur.setDate(cur.getDate()+14);
+  if(rep==='diario') cur.setDate(cur.getDate()+1);
+  else if(rep==='quinzenal') cur.setDate(cur.getDate()+14);
   else if(rep==='mensal') cur.setMonth(cur.getMonth()+1);
   return cur.toISOString().split('T')[0];
 }
@@ -2864,6 +2926,11 @@ async function delLembrete() {
   if(!id||!confirm('Excluir lembrete?')) return;
   try { await deleteDoc('lembretes',id); closeModal('lembrete'); showToast('Excluído.'); await loadCollection('lembretes'); renderLembretes(); renderDashboard(); }
   catch(e){showToast('Erro.','err');}
+}
+async function quickDelLembrete(id) {
+  if(!id||!confirm('Excluir este lembrete?')) return;
+  try { await deleteDoc('lembretes',id); showToast('Lembrete excluído.'); renderLembretes(); renderDashboard(); }
+  catch(e){showToast('Erro ao excluir.','err');}
 }
 async function concluirLembrete(id) {
   const l=cache.lembretes.find(x=>x.id===id); if(!l) return;
