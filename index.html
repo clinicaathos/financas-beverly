@@ -1928,7 +1928,9 @@ async function saveRec() {
       }
     }
     closeModal('rec'); showToast(editId?'Receita atualizada!':'Receita lançada!');
-    await loadCollection('receitas');
+    // saveDoc/deleteDoc já mantêm o cache local sincronizado — recarregar a coleção
+    // inteira do Firestore aqui só adiciona uma viagem de rede desnecessária e é a
+    // principal causa da demora percebida ao lançar/editar uma receita.
     refreshListasPagarReceber(); renderDashboard();
   } catch(e) { showToast('Erro ao salvar.','err'); console.error(e); }
 }
@@ -2019,7 +2021,8 @@ async function saveDesp() {
       await saveDoc('despesas', null, data);
       closeModal('desp'); showToast('Despesa lançada!');
     }
-    await loadCollection('despesas');
+    // saveDoc/deleteDoc já mantêm o cache local sincronizado — evita o refetch completo
+    // da coleção, que era a principal causa da demora ao lançar/editar uma despesa.
     refreshListasPagarReceber(); renderDashboard();
   } catch(e) { showToast('Erro ao salvar.','err'); console.error(e); }
 }
@@ -2128,16 +2131,22 @@ async function executarExclusao(colecao, id, escopo, fromModalId) {
     const item=cache[colecao].find(x=>x.id===id);
     if(escopo==='serie') {
       const serieId=item?.serieId;
-      const relacionados=serieId?cache[colecao].filter(x=>x.serieId===serieId):(item?[item]:[]);
+      const daSerie=serieId?cache[colecao].filter(x=>x.serieId===serieId):(item?[item]:[]);
+      // Histórico já baixado/pago nunca é apagado, mesmo ao excluir "toda a série" —
+      // apenas os lançamentos ainda pendentes daquela recorrência são removidos.
+      const relacionados=daSerie.filter(x=>x.status!=='Pago');
+      const preservados=daSerie.length-relacionados.length;
       await Promise.all(relacionados.map(r=>deleteDoc(colecao, r.id)));
-      showToast('Recorrência excluída.');
+      showToast(preservados>0?`Recorrência excluída. ${preservados} lançamento(s) já pago(s) foram preservados.`:'Recorrência excluída.');
     } else if(escopo==='futura') {
-      // Encerra a recorrência a partir desta data: remove esta ocorrência e todas as futuras da mesma série,
-      // preservando o histórico de ocorrências passadas já lançadas.
+      // Encerra a recorrência a partir desta data: remove esta ocorrência e as futuras pendentes
+      // da mesma série, preservando o histórico de ocorrências passadas e as já pagas.
       const serieId=item?.serieId;
-      const relacionados=serieId?cache[colecao].filter(x=>x.serieId===serieId && x.venc>=item.venc):(item?[item]:[]);
+      const futuras=serieId?cache[colecao].filter(x=>x.serieId===serieId && x.venc>=item.venc):(item?[item]:[]);
+      const relacionados=futuras.filter(x=>x.status!=='Pago');
+      const preservados=futuras.length-relacionados.length;
       await Promise.all(relacionados.map(r=>deleteDoc(colecao, r.id)));
-      showToast('Recorrência encerrada a partir desta data.');
+      showToast(preservados>0?`Recorrência encerrada a partir desta data. ${preservados} lançamento(s) já pago(s) foram preservados.`:'Recorrência encerrada a partir desta data.');
     } else {
       await deleteDoc(colecao, id);
       showToast(colecao==='receitas'?'Receita excluída.':'Despesa excluída.');
