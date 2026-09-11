@@ -1009,6 +1009,13 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db = firebase.firestore();
+// Persistência offline (IndexedDB): depois do primeiro carregamento, os dados ficam
+// em cache local no dispositivo. Reaberturas do app e trocas de aba passam a ler
+// do cache local (instantâneo) enquanto sincronizam em segundo plano, em vez de
+// esperar uma nova viagem de rede completa a cada vez.
+db.enablePersistence({ synchronizeTabs: true }).catch(e => {
+  console.warn('Persistência offline não pôde ser ativada:', e.code);
+});
 
 // ══ AUTH ══
 auth.onAuthStateChanged(async user => {
@@ -1125,6 +1132,21 @@ async function saveDoc(colecao, id, data) {
 async function deleteDoc(colecao, id) {
   await db.collection(colecao + '_bev').doc(id).delete();
   cache[colecao] = cache[colecao].filter(x => x.id !== id);
+}
+
+// Exclui vários documentos em uma única viagem de rede (Firestore batch, até 500 por lote)
+// em vez de uma requisição de delete por documento — usado ao excluir uma série inteira de
+// recorrência ou uma seleção múltipla, que antes disparava N deletes em paralelo.
+async function deleteDocsBatch(colecao, ids) {
+  if (!ids || !ids.length) return;
+  for (let i = 0; i < ids.length; i += 450) {
+    const chunk = ids.slice(i, i + 450);
+    const batch = db.batch();
+    chunk.forEach(id => batch.delete(db.collection(colecao + '_bev').doc(id)));
+    await batch.commit();
+  }
+  const idSet = new Set(ids);
+  cache[colecao] = cache[colecao].filter(x => !idSet.has(x.id));
 }
 
 // ══ UTILS ══
@@ -1424,7 +1446,7 @@ function renderRecTable(list) {
       <div class="mob-meta"><span class="badge ${r.status==='Pago'?'bg-green':'bg-yellow'} status-pill" onclick="toggleRec('${r.id}')">${r.status==='Pago'?'Recebido':'Pendente'}</span><span>${r.cat}</span>${r.venc?`<span>📅 ${fd(r.venc)}</span>`:''}</div>
       <div class="mob-actions"><button class="btn btn-ghost btn-sm" onclick="editRec('${r.id}')">✏️</button><button class="del-btn" onclick="quickDelRec('${r.id}')">🗑️</button></div>
     </div>`).join('');
-  initSwipe();
+  initSwipe('rec-cards');
   atualizarBarraSelRec();
 }
 
@@ -1463,7 +1485,7 @@ function renderDespTable(list) {
       <div class="mob-meta"><span class="badge ${d.status==='Pago'?'bg-green':'bg-yellow'} status-pill" onclick="toggleDesp('${d.id}')">${d.status==='Pago'?'Pago':'Pendente'}</span><span class="badge ${d.cat==='Fixo'?'bg-neutral':d.cat==='Variável'?'bg-yellow':'bg-red'}">${d.cat}</span>${d.venc?`<span>📅 ${fd(d.venc)}</span>`:''}</div>
       <div class="mob-actions"><button class="btn btn-ghost btn-sm" onclick="editDesp('${d.id}')">✏️</button><button class="del-btn" onclick="quickDelDesp('${d.id}')">🗑️</button></div>
     </div>`).join('');
-  initSwipe();
+  initSwipe('desp-cards');
   atualizarBarraSelDesp();
 }
 
@@ -1842,8 +1864,15 @@ async function toggleDesp(id) {
 }
 
 // ══ SWIPE ══
-function initSwipe() {
-  document.querySelectorAll('.mob-card').forEach(card=>{
+// Recebe o id do container (ex.: 'rec-cards' ou 'desp-cards') para religar os listeners
+// apenas nos cards daquela seção. Antes, ao chamar sem escopo, cada render de receitas
+// OU despesas varria .mob-card no documento inteiro — como as duas seções coexistem no
+// DOM, os cards já religados por uma chamada ganhavam um segundo listener na chamada
+// seguinte (duplo toggle ao arrastar no celular).
+function initSwipe(containerId) {
+  const root = containerId ? document.getElementById(containerId) : document;
+  if(!root) return;
+  root.querySelectorAll('.mob-card').forEach(card=>{
     let sx=0;
     card.addEventListener('touchstart',e=>{sx=e.touches[0].clientX;},{passive:true});
     card.addEventListener('touchmove',e=>{card.classList.toggle('swiped',sx-e.touches[0].clientX>40);},{passive:true});
@@ -2083,7 +2112,7 @@ async function excluirSelecionadosRec(){
   if(!selRecIds.size) return;
   if(!confirm(`Excluir ${selRecIds.size} lançamento(s) de receita selecionado(s)? Esta ação não pode ser desfeita.`)) return;
   try {
-    await Promise.all([...selRecIds].map(id=>deleteDoc('receitas', id)));
+    await deleteDocsBatch('receitas', [...selRecIds]);
     showToast(`${selRecIds.size} lançamento(s) excluído(s).`);
     selRecIds.clear();
     refreshListasPagarReceber();
@@ -2094,7 +2123,7 @@ async function excluirSelecionadosDesp(){
   if(!selDespIds.size) return;
   if(!confirm(`Excluir ${selDespIds.size} lançamento(s) de despesa selecionado(s)? Esta ação não pode ser desfeita.`)) return;
   try {
-    await Promise.all([...selDespIds].map(id=>deleteDoc('despesas', id)));
+    await deleteDocsBatch('despesas', [...selDespIds]);
     showToast(`${selDespIds.size} lançamento(s) excluído(s).`);
     selDespIds.clear();
     refreshListasPagarReceber();
@@ -2136,7 +2165,7 @@ async function executarExclusao(colecao, id, escopo, fromModalId) {
       // apenas os lançamentos ainda pendentes daquela recorrência são removidos.
       const relacionados=daSerie.filter(x=>x.status!=='Pago');
       const preservados=daSerie.length-relacionados.length;
-      await Promise.all(relacionados.map(r=>deleteDoc(colecao, r.id)));
+      await deleteDocsBatch(colecao, relacionados.map(r=>r.id));
       showToast(preservados>0?`Recorrência excluída. ${preservados} lançamento(s) já pago(s) foram preservados.`:'Recorrência excluída.');
     } else if(escopo==='futura') {
       // Encerra a recorrência a partir desta data: remove esta ocorrência e as futuras pendentes
@@ -2145,7 +2174,7 @@ async function executarExclusao(colecao, id, escopo, fromModalId) {
       const futuras=serieId?cache[colecao].filter(x=>x.serieId===serieId && x.venc>=item.venc):(item?[item]:[]);
       const relacionados=futuras.filter(x=>x.status!=='Pago');
       const preservados=futuras.length-relacionados.length;
-      await Promise.all(relacionados.map(r=>deleteDoc(colecao, r.id)));
+      await deleteDocsBatch(colecao, relacionados.map(r=>r.id));
       showToast(preservados>0?`Recorrência encerrada a partir desta data. ${preservados} lançamento(s) já pago(s) foram preservados.`:'Recorrência encerrada a partir desta data.');
     } else {
       await deleteDoc(colecao, id);
