@@ -449,6 +449,13 @@ body.dark .card,.dark .kpi,.dark .fin-stat,.dark .ind,.dark .conta-card,.dark .m
             <button class="btn btn-ghost" onclick="openModal('desp')">+ Despesa</button>
           </div>
         </div>
+        <div style="font-size:.66rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-3);margin-bottom:.4rem">Resumo Geral — todo o período</div>
+        <div class="fin-stats" style="margin-bottom:1.1rem;opacity:.82">
+          <div class="fin-stat" style="padding:.6rem .9rem"><div class="fin-stat-label">Receitas</div><div class="fin-stat-val" style="color:var(--green);font-size:1.05rem" id="g-rec">—</div></div>
+          <div class="fin-stat" style="padding:.6rem .9rem"><div class="fin-stat-label">Despesas</div><div class="fin-stat-val" style="color:var(--red);font-size:1.05rem" id="g-desp">—</div></div>
+          <div class="fin-stat" style="padding:.6rem .9rem"><div class="fin-stat-label">Saldo</div><div class="fin-stat-val" style="font-size:1.05rem" id="g-saldo">—</div></div>
+        </div>
+        <div style="font-size:.66rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-3);margin-bottom:.4rem" id="fin-mes-label">Resumo do Mês</div>
         <div class="fin-stats">
           <div class="fin-stat"><div class="fin-stat-label">Receita Total</div><div class="fin-stat-val" style="color:var(--green)" id="f-rec">—</div></div>
           <div class="fin-stat"><div class="fin-stat-label">Despesas</div><div class="fin-stat-val" style="color:var(--red)" id="f-desp">—</div></div>
@@ -846,6 +853,21 @@ body.dark .card,.dark .kpi,.dark .fin-stat,.dark .ind,.dark .conta-card,.dark .m
       <button class="btn btn-ghost" onclick="resolverEscopoEdicao(null)">Cancelar</button>
       <button class="btn btn-ghost" onclick="resolverEscopoEdicao('unica')">Apenas neste lançamento</button>
       <button class="btn btn-gold" onclick="resolverEscopoEdicao('futuras')">Em todos os lançamentos desta recorrência</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-baixa" onclick="closeMBg(event,'baixa')">
+  <div class="modal-box modal-sm">
+    <div class="modal-title" id="baixa-modal-title">Dar Baixa</div>
+    <div class="form-group">
+      <label class="form-label" id="baixa-data-label">Data do recebimento</label>
+      <input class="form-input" type="date" id="baixa-data">
+      <div style="font-size:.7rem;color:var(--text-3);margin-top:.375rem">A data preenchida é hoje por padrão, mas pode ser alterada para a data em que o pagamento/recebimento realmente ocorreu.</div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="cancelarBaixa()">Cancelar</button>
+      <button class="btn btn-gold" onclick="confirmarBaixa()">Confirmar</button>
     </div>
   </div>
 </div>
@@ -1721,8 +1743,18 @@ function refreshListasPagarReceber() {
 // Recalcula apenas os totais/KPIs do mês (cards do topo + sticky), sem reconstruir as tabelas.
 // Usado após dar baixa, para o usuário permanecer na mesma lista sem o lançamento sumir da tela.
 function atualizarTotaisLancamentos() {
-  const recMes=cache.receitas.filter(r=>isMesAtual(r.venc));
-  const despMes=cache.despesas.filter(d=>isMesAtual(d.venc));
+  // Resumo Geral — acumulado de todo o período disponível no sistema (todos os já efetivados)
+  const totalRecGeral=cache.receitas.filter(r=>r.status==='Pago').reduce((s,r)=>s+pm(r.val),0);
+  const totalDespGeral=cache.despesas.filter(d=>d.status==='Pago').reduce((s,d)=>s+pm(d.val),0);
+  const saldoGeral=totalRecGeral-totalDespGeral;
+  const gr=document.getElementById('g-rec'); if(gr) gr.textContent=fm(totalRecGeral);
+  const gd=document.getElementById('g-desp'); if(gd) gd.textContent=fm(totalDespGeral);
+  const gs=document.getElementById('g-saldo'); if(gs){ gs.textContent=fm(saldoGeral); gs.style.color=saldoGeral>=0?'var(--green)':'var(--red)'; }
+  // Resumo do Mês — apenas o mês selecionado/atual. Para lançamentos já efetivados,
+  // usa a data da baixa (dataPagamento) — e não o vencimento — pois é ela que reflete
+  // o mês em que a receita/despesa de fato ocorreu financeiramente.
+  const recMes=cache.receitas.filter(r=>r.status==='Pago'?isMesAtual(r.dataPagamento||r.venc):isMesAtual(r.venc));
+  const despMes=cache.despesas.filter(d=>d.status==='Pago'?isMesAtual(d.dataPagamento||d.venc):isMesAtual(d.venc));
   const totalRec=recMes.filter(r=>r.status==='Pago').reduce((s,r)=>s+pm(r.val),0);
   const totalDesp=despMes.filter(d=>d.status==='Pago').reduce((s,d)=>s+pm(d.val),0);
   const saldo=totalRec-totalDesp;
@@ -1816,14 +1848,72 @@ function switchRelatTab(id,el) {
 }
 
 // ══ STATUS TOGGLE ══
+// Marcar como Pago/Recebido abre o modal de "Dar Baixa" (data editável, ver abrirBaixa/
+// confirmarBaixa). Reverter para Pendente continua sendo imediato, sem necessidade de data.
 async function toggleRec(id) {
   const r=cache.receitas.find(x=>x.id===id); if(!r) return;
-  const novoStatus=r.status==='Pago'?'Pendente':'Pago';
-  const updateData={status:novoStatus,updatedAt:firebase.firestore.FieldValue.serverTimestamp()};
-  if(novoStatus==='Pago') updateData.dataPagamento=today();
-  else updateData.dataPagamento='';
-  r.status=novoStatus;
-  if(novoStatus==='Pago') r.dataPagamento=today(); else r.dataPagamento='';
+  if(r.status==='Pago') { await reverterRec(id); }
+  else { abrirBaixa(id,'rec'); }
+}
+async function toggleDesp(id) {
+  const d=cache.despesas.find(x=>x.id===id); if(!d) return;
+  if(d.status==='Pago') { await reverterDesp(id); }
+  else { abrirBaixa(id,'desp'); }
+}
+async function reverterRec(id) {
+  const r=cache.receitas.find(x=>x.id===id); if(!r) return;
+  const updateData={status:'Pendente',dataPagamento:'',updatedAt:firebase.firestore.FieldValue.serverTimestamp()};
+  r.status='Pendente'; r.dataPagamento='';
+  try { await db.collection('receitas_bev').doc(id).update(updateData); }
+  catch(e) { showToast('Erro ao atualizar.','err'); return; }
+  recCache=cache.receitas.filter(x=>x.status!=='Pago');
+  reaplicarFiltroRec();
+  atualizarTotaisLancamentos();
+  renderDashboard();
+  showToast('Marcado como Pendente');
+}
+async function reverterDesp(id) {
+  const d=cache.despesas.find(x=>x.id===id); if(!d) return;
+  const updateData={status:'Pendente',dataPagamento:'',updatedAt:firebase.firestore.FieldValue.serverTimestamp()};
+  d.status='Pendente'; d.dataPagamento='';
+  try { await db.collection('despesas_bev').doc(id).update(updateData); }
+  catch(e) { showToast('Erro ao atualizar.','err'); return; }
+  despCache=cache.despesas.filter(x=>x.status!=='Pago');
+  reaplicarFiltroDesp();
+  atualizarTotaisLancamentos();
+  renderDashboard();
+  showToast('Marcado como Pendente');
+}
+
+// ══ DAR BAIXA (data de efetivação editável, independente da data da operação) ══
+// A "data da operação" (quando o usuário de fato clicou em dar baixa) fica registrada
+// automaticamente em updatedAt (serverTimestamp) e nunca é alterada pelo usuário.
+// A "data da baixa/efetivação" (quando o pagamento/recebimento de fato ocorreu) é o
+// campo dataPagamento, editável aqui, e é essa data usada nos cálculos por mês.
+let _baixaCtx=null;
+function abrirBaixa(id, tipo) {
+  _baixaCtx={id,tipo};
+  document.getElementById('baixa-modal-title').textContent = tipo==='rec' ? 'Dar Baixa — Recebimento' : 'Dar Baixa — Pagamento';
+  document.getElementById('baixa-data-label').textContent = tipo==='rec' ? 'Data do recebimento' : 'Data do pagamento';
+  document.getElementById('baixa-data').value = today();
+  document.getElementById('modal-baixa')?.classList.add('open');
+}
+function cancelarBaixa() {
+  document.getElementById('modal-baixa')?.classList.remove('open');
+  _baixaCtx=null;
+}
+async function confirmarBaixa() {
+  if(!_baixaCtx) return;
+  const {id,tipo}=_baixaCtx;
+  const dataBaixa=document.getElementById('baixa-data').value || today();
+  document.getElementById('modal-baixa')?.classList.remove('open');
+  _baixaCtx=null;
+  if(tipo==='rec') await efetivarRec(id,dataBaixa); else await efetivarDesp(id,dataBaixa);
+}
+async function efetivarRec(id, dataBaixa) {
+  const r=cache.receitas.find(x=>x.id===id); if(!r) return;
+  const updateData={status:'Pago',dataPagamento:dataBaixa,updatedAt:firebase.firestore.FieldValue.serverTimestamp()};
+  r.status='Pago'; r.dataPagamento=dataBaixa;
   try { await db.collection('receitas_bev').doc(id).update(updateData); }
   catch(e) { showToast('Erro ao atualizar.','err'); return; }
   // Após a baixa, o lançamento sai de "A Receber" (que mostra só pendentes) e passa
@@ -1833,20 +1923,12 @@ async function toggleRec(id) {
   reaplicarFiltroRec();
   atualizarTotaisLancamentos();
   renderDashboard();
-  if(novoStatus==='Pago') {
-    showToast('Recebido ✓','ok');
-  } else {
-    showToast('Marcado como Pendente');
-  }
+  showToast('Recebido ✓','ok');
 }
-async function toggleDesp(id) {
+async function efetivarDesp(id, dataBaixa) {
   const d=cache.despesas.find(x=>x.id===id); if(!d) return;
-  const novoStatus=d.status==='Pago'?'Pendente':'Pago';
-  const updateData={status:novoStatus,updatedAt:firebase.firestore.FieldValue.serverTimestamp()};
-  if(novoStatus==='Pago') updateData.dataPagamento=today();
-  else updateData.dataPagamento='';
-  d.status=novoStatus;
-  if(novoStatus==='Pago') d.dataPagamento=today(); else d.dataPagamento='';
+  const updateData={status:'Pago',dataPagamento:dataBaixa,updatedAt:firebase.firestore.FieldValue.serverTimestamp()};
+  d.status='Pago'; d.dataPagamento=dataBaixa;
   try { await db.collection('despesas_bev').doc(id).update(updateData); }
   catch(e) { showToast('Erro ao atualizar.','err'); return; }
   // Após a baixa, o lançamento sai de "A Pagar" (que mostra só pendentes) e passa
@@ -1856,11 +1938,7 @@ async function toggleDesp(id) {
   reaplicarFiltroDesp();
   atualizarTotaisLancamentos();
   renderDashboard();
-  if(novoStatus==='Pago') {
-    showToast('Pago ✓','ok');
-  } else {
-    showToast('Marcado como Pendente');
-  }
+  showToast('Pago ✓','ok');
 }
 
 // ══ SWIPE ══
